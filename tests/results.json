@@ -1,0 +1,264 @@
+{
+  "timestamp": "2026-04-02T23:55:02.361025",
+  "summary": {
+    "total": 25,
+    "correct": 25,
+    "failed": 0,
+    "accuracy": 100.0,
+    "avg_diagnosis_time_ms": 1.2,
+    "avg_questions": 3.8
+  },
+  "failed_cases": [],
+  "results": [
+    {
+      "test_id": "TC01",
+      "description": "Máy không phản hồi, không đèn, không quạt → PSU / nguồn lỗi",
+      "expected_rule": "R01",
+      "actual_rule": "R01",
+      "actual_cause": "Không có điện đầu vào hoặc PSU lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.98,
+      "questions_asked": 3
+    },
+    {
+      "test_id": "TC02",
+      "description": "Máy bật lên rồi tắt ngay, nóng → CPU quá nhiệt",
+      "expected_rule": "R04",
+      "actual_rule": "R04",
+      "actual_cause": "CPU quá nhiệt hoặc tản nhiệt lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.33,
+      "questions_asked": 4
+    },
+    {
+      "test_id": "TC03",
+      "description": "Máy bật, có quạt nhưng không lên hình → RAM lỏng",
+      "expected_rule": "R08",
+      "actual_rule": "R08",
+      "actual_cause": "RAM lỏng hoặc lỗi kết nối hiển thị",
+      "correct": true,
+      "diagnosis_time_ms": 1.12,
+      "questions_asked": 3
+    },
+    {
+      "test_id": "TC04",
+      "description": "Màn hình không nhận tín hiệu → Cáp lỏng",
+      "expected_rule": "R10",
+      "actual_rule": "R10",
+      "actual_cause": "Cáp màn hình lỏng hoặc sai cổng",
+      "correct": true,
+      "diagnosis_time_ms": 1.21,
+      "questions_asked": 3
+    },
+    {
+      "test_id": "TC05",
+      "description": "Màn hình bị sọc → Panel lỗi",
+      "expected_rule": "R11",
+      "actual_rule": "R11",
+      "actual_cause": "Panel màn hình lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.07,
+      "questions_asked": 3
+    },
+    {
+      "test_id": "TC06",
+      "description": "BSOD, không vào Windows → Driver lỗi",
+      "expected_rule": "R15",
+      "actual_rule": "R15",
+      "actual_cause": "Driver lỗi hoặc xung đột hệ thống",
+      "correct": true,
+      "diagnosis_time_ms": 1.14,
+      "questions_asked": 4
+    },
+    {
+      "test_id": "TC07",
+      "description": "Boot loop, không vào Windows → Update lỗi",
+      "expected_rule": "R18",
+      "actual_rule": "R18",
+      "actual_cause": "Update lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.1,
+      "questions_asked": 4
+    },
+    {
+      "test_id": "TC08",
+      "description": "Không nhận ổ boot → HDD/SSD lỗi",
+      "expected_rule": "R19",
+      "actual_rule": "R19",
+      "actual_cause": "HDD/SSD lỗi hoặc BIOS không nhận",
+      "correct": true,
+      "diagnosis_time_ms": 1.09,
+      "questions_asked": 4
+    },
+    {
+      "test_id": "TC09",
+      "description": "Có Wi-Fi, có Internet nhưng không mở web → Firewall chặn",
+      "expected_rule": "R27",
+      "actual_rule": "R27",
+      "actual_cause": "Firewall/proxy chặn",
+      "correct": true,
+      "diagnosis_time_ms": 1.27,
+      "questions_asked": 6
+    },
+    {
+      "test_id": "TC10",
+      "description": "Máy chậm, app lag → RAM thấp",
+      "expected_rule": "R31",
+      "actual_rule": "R31",
+      "actual_cause": "RAM thấp hoặc nhiều ứng dụng",
+      "correct": true,
+      "diagnosis_time_ms": 1.13,
+      "questions_asked": 5
+    },
+    {
+      "test_id": "TC11",
+      "description": "Không nhận USB → Cổng USB lỗi",
+      "expected_rule": "R37",
+      "actual_rule": "R37",
+      "actual_cause": "Cổng USB lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.18,
+      "questions_asked": 4
+    },
+    {
+      "test_id": "TC12",
+      "description": "Chuột không hoạt động → Chuột hỏng",
+      "expected_rule": "R39",
+      "actual_rule": "R39",
+      "actual_cause": "Chuột hỏng",
+      "correct": true,
+      "diagnosis_time_ms": 1.13,
+      "questions_asked": 4
+    },
+    {
+      "test_id": "TC13",
+      "description": "Màn hình nhấp nháy → Driver hiển thị lỗi",
+      "expected_rule": "R12",
+      "actual_rule": "R12",
+      "actual_cause": "Driver hiển thị lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.13,
+      "questions_asked": 3
+    },
+    {
+      "test_id": "TC14",
+      "description": "Có beep, không qua POST → Lỗi phần cứng",
+      "expected_rule": "R07",
+      "actual_rule": "R07",
+      "actual_cause": "Lỗi phần cứng (RAM/VGA/CPU)",
+      "correct": true,
+      "diagnosis_time_ms": 1.23,
+      "questions_asked": 3
+    },
+    {
+      "test_id": "TC15",
+      "description": "Đăng nhập xong → màn hình đen → Explorer lỗi",
+      "expected_rule": "R22",
+      "actual_rule": "R22",
+      "actual_cause": "Explorer lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.17,
+      "questions_asked": 5
+    },
+    {
+      "test_id": "TC16",
+      "description": "Disk 100%, máy chậm → Disk lỗi",
+      "expected_rule": "R34",
+      "actual_rule": "R34",
+      "actual_cause": "Disk lỗi hoặc quá tải",
+      "correct": true,
+      "diagnosis_time_ms": 1.13,
+      "questions_asked": 5
+    },
+    {
+      "test_id": "TC17",
+      "description": "Máy nóng, quạt kêu to → Tản nhiệt kém",
+      "expected_rule": "R35",
+      "actual_rule": "R35",
+      "actual_cause": "Tản nhiệt kém",
+      "correct": true,
+      "diagnosis_time_ms": 1.42,
+      "questions_asked": 5
+    },
+    {
+      "test_id": "TC18",
+      "description": "Wi-Fi kết nối, không internet, ping được gateway nhưng không ping ra ngoài → DNS lỗi",
+      "expected_rule": "R24",
+      "actual_rule": "R24",
+      "actual_cause": "DNS lỗi hoặc router lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.22,
+      "questions_asked": 7
+    },
+    {
+      "test_id": "TC19",
+      "description": "Không có âm thanh dù Windows hoạt động → Driver audio lỗi",
+      "expected_rule": "R40",
+      "actual_rule": "R40",
+      "actual_cause": "Driver audio lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.14,
+      "questions_asked": 4
+    },
+    {
+      "test_id": "TC20",
+      "description": "Treo khi khởi động, không vào Windows → Lỗi OS",
+      "expected_rule": "R16",
+      "actual_rule": "R16",
+      "actual_cause": "Lỗi OS",
+      "correct": true,
+      "diagnosis_time_ms": 1.05,
+      "questions_asked": 4
+    },
+    {
+      "test_id": "TC_EDGE_01",
+      "description": "EDGE: Chỉ có 1 triệu chứng, không đủ để khớp luật → null",
+      "expected_rule": null,
+      "actual_rule": null,
+      "actual_cause": "Không xác định được lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.07,
+      "questions_asked": 1
+    },
+    {
+      "test_id": "TC_EDGE_02",
+      "description": "EDGE: Nhiều luật khớp → chọn R32 (priority 88 > R31 khi thiếu system_slow)",
+      "expected_rule": "R31",
+      "actual_rule": "R31",
+      "actual_cause": "RAM thấp hoặc nhiều ứng dụng",
+      "correct": true,
+      "diagnosis_time_ms": 1.17,
+      "questions_asked": 3
+    },
+    {
+      "test_id": "TC_EDGE_03",
+      "description": "EDGE: Không có triệu chứng nào → null",
+      "expected_rule": null,
+      "actual_rule": null,
+      "actual_cause": "Không xác định được lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 0.87,
+      "questions_asked": 0
+    },
+    {
+      "test_id": "TC_EDGE_04",
+      "description": "EDGE: Tất cả đều true → chọn luật ưu tiên cao nhất khớp",
+      "expected_rule": "R11",
+      "actual_rule": "R11",
+      "actual_cause": "Panel màn hình lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.24,
+      "questions_asked": 6
+    },
+    {
+      "test_id": "TC_EDGE_05",
+      "description": "EDGE: Laptop không bật, pin lỗi → R05",
+      "expected_rule": "R05",
+      "actual_rule": "R05",
+      "actual_cause": "Pin hoặc adapter lỗi",
+      "correct": true,
+      "diagnosis_time_ms": 1.41,
+      "questions_asked": 3
+    }
+  ]
+}

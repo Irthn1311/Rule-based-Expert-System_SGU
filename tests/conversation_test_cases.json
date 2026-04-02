@@ -1,0 +1,140 @@
+[
+  {
+    "test_id": "NLP_01",
+    "group": "NLP_FREE_TEXT",
+    "description": "Parse basic symptom",
+    "steps": [
+      {"user": "máy không lên nguồn"}
+    ],
+    "expected_facts": {"power_response": false}
+  },
+  {
+    "test_id": "NLP_02",
+    "group": "NLP_FREE_TEXT",
+    "description": "Parse multiple symptoms",
+    "steps": [
+      {"user": "máy chạy chậm và quạt kêu to"}
+    ],
+    "expected_facts": {"system_slow": true, "fan_noise_loud": true}
+  },
+  {
+    "test_id": "NLP_03",
+    "group": "NLP_FREE_TEXT",
+    "description": "Parse without diacritics",
+    "steps": [
+      {"user": "may khong len hinh"}
+    ],
+    "expected_facts": {"display_on": false}
+  },
+  {
+    "test_id": "NLP_04",
+    "group": "NLP_FREE_TEXT",
+    "description": "Parse positive and negative symptoms",
+    "steps": [
+      {"user": "có wifi nhưng không vào mạng"}
+    ],
+    "expected_facts": {"wifi_connected": true, "internet_access": false}
+  },
+
+  {
+    "test_id": "CTX_YES_01",
+    "group": "CONTEXT_YES_NO",
+    "description": "Map short 'có' to current question",
+    "steps": [
+      {"user": "chẩn đoán giúp tôi"},
+      {"user": "có"}
+    ],
+    "expected_progression": true
+  },
+  {
+    "test_id": "CTX_NO_01",
+    "group": "CONTEXT_YES_NO",
+    "description": "Map short 'không' to current question",
+    "steps": [
+      {"user": "chẩn đoán giúp tôi"},
+      {"user": "khong"}
+    ],
+    "expected_progression": true
+  },
+
+  {
+    "test_id": "CTX_TXT_01",
+    "group": "CONTEXT_FREE_TEXT",
+    "description": "Parse contextual phrase (positive)",
+    "steps": [
+      {"user": "chẩn đoán giúp tôi"},
+      {"user": "vẫn hoạt động bình thường"}
+    ],
+    "expected_progression": true
+  },
+  {
+    "test_id": "CTX_TXT_02",
+    "group": "CONTEXT_FREE_TEXT",
+    "description": "Parse contextual phrase (negative)",
+    "steps": [
+      {"user": "chẩn đoán giúp tôi"},
+      {"user": "không thấy gì cả"}
+    ],
+    "expected_progression": true
+  },
+
+  {
+    "test_id": "LOOP_01",
+    "group": "LOOP_DETECTION",
+    "description": "Handle unclear input with clarification",
+    "steps": [
+      {"user": "chẩn đoán giúp tôi"},
+      {"user": "hả?"}
+    ],
+    "expected_clarification": true
+  },
+  {
+    "test_id": "LOOP_02",
+    "group": "LOOP_DETECTION",
+    "description": "Do not repeat question infinitely on repeated bad input",
+    "steps": [
+      {"user": "chẩn đoán giúp tôi"},
+      {"user": "abc xyz"},
+      {"user": "tôi không hiểu"}
+    ],
+    "expected_clarification": true
+  },
+
+  {
+    "test_id": "E2E_01",
+    "group": "END_TO_END",
+    "description": "Diagnosis PSU Rule R01",
+    "steps": [
+      {"user": "máy không lên nguồn, đèn không sáng, quạt không quay"}
+    ],
+    "expected_rule": "R01"
+  },
+  {
+    "test_id": "E2E_02",
+    "group": "END_TO_END",
+    "description": "Diagnosis Display Rule R11",
+    "steps": [
+      {"user": "màn hình bị sọc ngang"},
+      {"user": "màn hình vẫn hiển thị bình thường"}
+    ],
+    "expected_rule": "R11"
+  },
+  {
+    "test_id": "E2E_03",
+    "group": "END_TO_END",
+    "description": "Diagnosis System Slow/Lag Rule R31",
+    "steps": [
+      {"user": "mở ứng dụng lag và máy tính chạy chậm"}
+    ],
+    "expected_rule": "R31"
+  },
+  {
+    "test_id": "E2E_04",
+    "group": "END_TO_END",
+    "description": "Diagnosis Network Rule R24",
+    "steps": [
+      {"user": "có kết nối wifi nhưng máy tính không vào mạng, ping được gateway, nhưng ping internet không được"}
+    ],
+    "expected_rule": "R24"
+  }
+]

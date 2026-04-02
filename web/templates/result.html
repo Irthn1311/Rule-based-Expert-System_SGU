@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kết quả chẩn đoán lỗi máy tính">
+    <title>Kết Quả Chẩn Đoán</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">🖥️</div>
+                <span class="logo-text">PC Doctor</span>
+            </div>
+            <p class="header-subtitle">Kết quả chẩn đoán</p>
+        </div>
+
+        <!-- Result Card -->
+        <div class="card result-section">
+            {% if diagnosis.rule_id %}
+                <!-- Success: Rule engine confirmed the diagnosis -->
+                <span class="result-icon">🎯</span>
+                <span class="result-status success">Đã xác định nguyên nhân</span>
+
+                <!-- Diagnosis Details -->
+                <div class="result-details">
+                    <div class="result-row">
+                        <div class="result-row-icon">🔴</div>
+                        <div class="result-row-content">
+                            <div class="result-row-label">Nguyên nhân</div>
+                            <div class="result-row-value">{{ diagnosis.cause }}</div>
+                        </div>
+                    </div>
+                    <div class="result-row">
+                        <div class="result-row-icon">🟢</div>
+                        <div class="result-row-content">
+                            <div class="result-row-label">Giải pháp đề xuất</div>
+                            <div class="result-row-value">{{ diagnosis.solution }}</div>
+                        </div>
+                    </div>
+                    <div class="result-row">
+                        <div class="result-row-icon">📋</div>
+                        <div class="result-row-content">
+                            <div class="result-row-label">Luật kích hoạt</div>
+                            <div class="result-row-value">{{ diagnosis.rule_id }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ question_count }}</div>
+                        <div class="stat-label">Câu hỏi</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ "%.2f"|format(diagnosis.diagnosis_time_ms) }}ms</div>
+                        <div class="stat-label">Thời gian suy luận</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ diagnosis.all_matches|length if diagnosis.all_matches else 0 }}</div>
+                        <div class="stat-label">Luật khớp</div>
+                    </div>
+                </div>
+
+            {% else %}
+                <!-- Fallback: No rule matched -->
+                <div class="no-result">
+                    <div class="no-result-icon">🤔</div>
+                    <span class="result-status warning">Không xác định được lỗi</span>
+                    <p class="no-result-text">
+                        {{ diagnosis.cause }}<br>
+                        <strong>{{ diagnosis.solution }}</strong>
+                    </p>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ question_count }}</div>
+                        <div class="stat-label">Câu hỏi</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ "%.2f"|format(diagnosis.diagnosis_time_ms) }}ms</div>
+                        <div class="stat-label">Thời gian suy luận</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Luật khớp</div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="btn-group" style="margin-top: 1.5rem;">
+                <a href="{{ url_for('reset') }}" class="btn btn-primary" id="btn-restart">
+                    🔄 Chẩn đoán lại
+                </a>
+                {% if not debug_mode %}
+                <a href="{{ url_for('result', debug='true') }}" class="btn btn-outline" id="btn-debug">
+                    🐞 Xem Debug
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Debug Section -->
+            {% if debug_mode %}
+            <div class="debug-section">
+                <div class="debug-title">
+                    🐞 Thông Tin Debug
+                </div>
+
+                <!-- Decision Source -->
+                <h4 style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.85rem;">Nguồn quyết định:</h4>
+                <div class="debug-content">
+                    {% if diagnosis.decision_source == 'rule_engine' %}
+                    <div class="matched">🏆 Rule Engine → {{ diagnosis.rule_id }} ({{ diagnosis.cause }})</div>
+                    {% else %}
+                    <div class="not-matched">⚠️ Fallback — Không có luật nào được kích hoạt</div>
+                    {% endif %}
+                </div>
+
+                <!-- User Answers -->
+                <h4 style="color: var(--text-secondary); margin: 1rem 0 0.5rem; font-size: 0.85rem;">Sự kiện (Facts) đã thu thập:</h4>
+                <div class="debug-answers">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symptom Code</th>
+                                <th>Giá trị</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for code, value in answers.items() %}
+                            <tr>
+                                <td>{{ code }}</td>
+                                <td class="{{ 'val-true' if value else 'val-false' }}">
+                                    {{ 'TRUE' if value else 'FALSE' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Evaluated Rules -->
+                {% if diagnosis.debug_info %}
+                <h4 style="color: var(--text-secondary); margin: 1rem 0 0.5rem; font-size: 0.85rem;">Kết quả đánh giá từng luật:</h4>
+                <div class="debug-content">
+                    {% for info in diagnosis.debug_info %}
+                    <div class="{{ 'matched' if '✅' in info else 'not-matched' }}">{{ info }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <a href="{{ url_for('index') }}">← Trang chủ</a>
+        </div>
+    </div>
+</body>
+</html>

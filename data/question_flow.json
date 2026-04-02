@@ -1,0 +1,41 @@
+[
+  {"step": "1", "question_code": "power_response", "question_text": "Máy có phản hồi khi nhấn nút nguồn không?", "yes_next": "2", "no_next": "P1", "group": "routing"},
+  {"step": "2", "question_code": "display_on", "question_text": "Màn hình có hiển thị không?", "yes_next": "3", "no_next": "D1", "group": "routing"},
+  {"step": "3", "question_code": "windows_accessible", "question_text": "Có vào được Windows không?", "yes_next": "O5", "no_next": "O1", "group": "routing"},
+  {"step": "4", "question_code": "wifi_connected", "question_text": "Máy có kết nối Wi-Fi không?", "yes_next": "N1", "no_next": "5", "group": "routing"},
+  {"step": "5", "question_code": "system_slow", "question_text": "Máy có chạy chậm hoặc lag không?", "yes_next": "PF1", "no_next": "6", "group": "routing"},
+  {"step": "6", "question_code": "keyboard_working", "question_text": "Bàn phím/chuột có hoạt động không?", "yes_next": "END", "no_next": "PE1", "group": "routing"},
+
+  {"step": "P1", "question_code": "led_on", "question_text": "Đèn nguồn có sáng không?", "yes_next": "P2", "no_next": "R01", "group": "power"},
+  {"step": "P2", "question_code": "fan_running", "question_text": "Quạt có quay không?", "yes_next": "P3", "no_next": "R02", "group": "power"},
+  {"step": "P3", "question_code": "shutdown_immediately", "question_text": "Máy có bật rồi tắt ngay không?", "yes_next": "R04", "no_next": "P4", "group": "power"},
+  {"step": "P4", "question_code": "beep_sound", "question_text": "Có tiếng beep không?", "yes_next": "R07", "no_next": "R03", "group": "power"},
+
+  {"step": "D1", "question_code": "signal_detected", "question_text": "Màn hình có nhận tín hiệu không?", "yes_next": "D2", "no_next": "R10", "group": "display"},
+  {"step": "D2", "question_code": "screen_black", "question_text": "Màn hình có bị đen hoàn toàn không?", "yes_next": "R09", "no_next": "D3", "group": "display"},
+  {"step": "D3", "question_code": "screen_lines", "question_text": "Màn hình có bị sọc không?", "yes_next": "R11", "no_next": "D4", "group": "display"},
+  {"step": "D4", "question_code": "screen_flicker", "question_text": "Màn hình có nhấp nháy không?", "yes_next": "R12", "no_next": "D5", "group": "display"},
+  {"step": "D5", "question_code": "resolution_correct", "question_text": "Độ phân giải có đúng không?", "yes_next": "D6", "no_next": "R13", "group": "display"},
+  {"step": "D6", "question_code": "brightness_ok", "question_text": "Màn hình có đủ sáng không?", "yes_next": "END", "no_next": "R14", "group": "display"},
+
+  {"step": "O1", "question_code": "bsod", "question_text": "Có xuất hiện màn hình xanh không?", "yes_next": "R15", "no_next": "O2", "group": "os"},
+  {"step": "O2", "question_code": "startup_freeze", "question_text": "Máy có bị treo khi khởi động không?", "yes_next": "R16", "no_next": "O3", "group": "os"},
+  {"step": "O3", "question_code": "boot_loop", "question_text": "Máy có bị khởi động lặp không?", "yes_next": "R18", "no_next": "O4", "group": "os"},
+  {"step": "O4", "question_code": "boot_device_found", "question_text": "Máy có nhận ổ boot không?", "yes_next": "R17", "no_next": "R19", "group": "os"},
+  {"step": "O5", "question_code": "login_success", "question_text": "Có đăng nhập được không?", "yes_next": "O6", "no_next": "R21", "group": "os"},
+  {"step": "O6", "question_code": "black_after_login", "question_text": "Có màn hình đen sau login không?", "yes_next": "R22", "no_next": "4", "group": "os"},
+
+  {"step": "N1", "question_code": "internet_access", "question_text": "Có truy cập Internet không?", "yes_next": "N2", "no_next": "N3", "group": "network"},
+  {"step": "N2", "question_code": "web_accessible", "question_text": "Có mở được web không?", "yes_next": "END", "no_next": "R27", "group": "network"},
+  {"step": "N3", "question_code": "ping_gateway", "question_text": "Có ping được gateway không?", "yes_next": "N4", "no_next": "R30", "group": "network"},
+  {"step": "N4", "question_code": "ping_external", "question_text": "Có ping ra Internet không?", "yes_next": "R27", "no_next": "R24", "group": "network"},
+
+  {"step": "PF1", "question_code": "app_lag", "question_text": "Mở app có lag không?", "yes_next": "PF2", "no_next": "END", "group": "performance"},
+  {"step": "PF2", "question_code": "system_hot", "question_text": "Máy có nóng không?", "yes_next": "R32", "no_next": "PF3", "group": "performance"},
+  {"step": "PF3", "question_code": "disk_usage_high", "question_text": "Disk có 100% không?", "yes_next": "R34", "no_next": "R31", "group": "performance"},
+
+  {"step": "PE1", "question_code": "mouse_working", "question_text": "Chuột có hoạt động không?", "yes_next": "PE2", "no_next": "R39", "group": "peripheral"},
+  {"step": "PE2", "question_code": "keyboard_working", "question_text": "Bàn phím có hoạt động không?", "yes_next": "PE3", "no_next": "R38", "group": "peripheral"},
+  {"step": "PE3", "question_code": "usb_detected", "question_text": "USB có nhận không?", "yes_next": "PE4", "no_next": "R37", "group": "peripheral"},
+  {"step": "PE4", "question_code": "audio_output", "question_text": "Có âm thanh không?", "yes_next": "END", "no_next": "R40", "group": "peripheral"}
+]

@@ -1,0 +1,272 @@
+[
+  {
+    "test_id": "TC01",
+    "description": "Máy không phản hồi, không đèn, không quạt → PSU / nguồn lỗi",
+    "answers": {
+      "power_response": false,
+      "led_on": false,
+      "fan_running": false
+    },
+    "expected_rule": "R01"
+  },
+  {
+    "test_id": "TC02",
+    "description": "Máy bật lên rồi tắt ngay, nóng → CPU quá nhiệt",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "shutdown_immediately": true,
+      "system_hot": true
+    },
+    "expected_rule": "R04"
+  },
+  {
+    "test_id": "TC03",
+    "description": "Máy bật, có quạt nhưng không lên hình → RAM lỏng",
+    "answers": {
+      "power_response": true,
+      "display_on": false,
+      "fan_running": true
+    },
+    "expected_rule": "R08"
+  },
+  {
+    "test_id": "TC04",
+    "description": "Màn hình không nhận tín hiệu → Cáp lỏng",
+    "answers": {
+      "power_response": true,
+      "display_on": false,
+      "signal_detected": false
+    },
+    "expected_rule": "R10"
+  },
+  {
+    "test_id": "TC05",
+    "description": "Màn hình bị sọc → Panel lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "screen_lines": true
+    },
+    "expected_rule": "R11"
+  },
+  {
+    "test_id": "TC06",
+    "description": "BSOD, không vào Windows → Driver lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": false,
+      "bsod": true
+    },
+    "expected_rule": "R15"
+  },
+  {
+    "test_id": "TC07",
+    "description": "Boot loop, không vào Windows → Update lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": false,
+      "boot_loop": true
+    },
+    "expected_rule": "R18"
+  },
+  {
+    "test_id": "TC08",
+    "description": "Không nhận ổ boot → HDD/SSD lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": false,
+      "boot_device_found": false
+    },
+    "expected_rule": "R19"
+  },
+  {
+    "test_id": "TC09",
+    "description": "Có Wi-Fi, có Internet nhưng không mở web → Firewall chặn",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "wifi_connected": true,
+      "internet_access": true,
+      "web_accessible": false
+    },
+    "expected_rule": "R27"
+  },
+  {
+    "test_id": "TC10",
+    "description": "Máy chậm, app lag → RAM thấp",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "system_slow": true,
+      "app_lag": true
+    },
+    "expected_rule": "R31"
+  },
+  {
+    "test_id": "TC11",
+    "description": "Không nhận USB → Cổng USB lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "usb_detected": false
+    },
+    "expected_rule": "R37"
+  },
+  {
+    "test_id": "TC12",
+    "description": "Chuột không hoạt động → Chuột hỏng",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "mouse_working": false
+    },
+    "expected_rule": "R39"
+  },
+  {
+    "test_id": "TC13",
+    "description": "Màn hình nhấp nháy → Driver hiển thị lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "screen_flicker": true
+    },
+    "expected_rule": "R12"
+  },
+  {
+    "test_id": "TC14",
+    "description": "Có beep, không qua POST → Lỗi phần cứng",
+    "answers": {
+      "power_response": true,
+      "beep_sound": true,
+      "post_success": false
+    },
+    "expected_rule": "R07"
+  },
+  {
+    "test_id": "TC15",
+    "description": "Đăng nhập xong → màn hình đen → Explorer lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "login_success": true,
+      "black_after_login": true
+    },
+    "expected_rule": "R22"
+  },
+  {
+    "test_id": "TC16",
+    "description": "Disk 100%, máy chậm → Disk lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "system_slow": true,
+      "disk_usage_high": true
+    },
+    "expected_rule": "R34"
+  },
+  {
+    "test_id": "TC17",
+    "description": "Máy nóng, quạt kêu to → Tản nhiệt kém",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "system_hot": true,
+      "fan_noise_loud": true
+    },
+    "expected_rule": "R35"
+  },
+  {
+    "test_id": "TC18",
+    "description": "Wi-Fi kết nối, không internet, ping được gateway nhưng không ping ra ngoài → DNS lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "wifi_connected": true,
+      "internet_access": false,
+      "ping_gateway": true,
+      "ping_external": false
+    },
+    "expected_rule": "R24"
+  },
+  {
+    "test_id": "TC19",
+    "description": "Không có âm thanh dù Windows hoạt động → Driver audio lỗi",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": true,
+      "audio_output": false
+    },
+    "expected_rule": "R40"
+  },
+  {
+    "test_id": "TC20",
+    "description": "Treo khi khởi động, không vào Windows → Lỗi OS",
+    "answers": {
+      "power_response": true,
+      "display_on": true,
+      "windows_accessible": false,
+      "startup_freeze": true
+    },
+    "expected_rule": "R16"
+  },
+  {
+    "test_id": "TC_EDGE_01",
+    "description": "EDGE: Chỉ có 1 triệu chứng, không đủ để khớp luật → null",
+    "answers": {
+      "power_response": true
+    },
+    "expected_rule": null
+  },
+  {
+    "test_id": "TC_EDGE_02",
+    "description": "EDGE: Nhiều luật khớp → chọn R32 (priority 88 > R31 khi thiếu system_slow)",
+    "answers": {
+      "system_slow": true,
+      "app_lag": true,
+      "system_hot": true
+    },
+    "expected_rule": "R31"
+  },
+  {
+    "test_id": "TC_EDGE_03",
+    "description": "EDGE: Không có triệu chứng nào → null",
+    "answers": {},
+    "expected_rule": null
+  },
+  {
+    "test_id": "TC_EDGE_04",
+    "description": "EDGE: Tất cả đều true → chọn luật ưu tiên cao nhất khớp",
+    "answers": {
+      "power_response": true,
+      "led_on": true,
+      "fan_running": true,
+      "display_on": true,
+      "screen_lines": true,
+      "screen_flicker": true
+    },
+    "expected_rule": "R11"
+  },
+  {
+    "test_id": "TC_EDGE_05",
+    "description": "EDGE: Laptop không bật, pin lỗi → R05",
+    "answers": {
+      "laptop_device": true,
+      "power_response": false,
+      "battery_ok": false
+    },
+    "expected_rule": "R05"
+  }
+]
