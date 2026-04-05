@@ -22,6 +22,7 @@
 | 2 | 3123410274 | Lư Hồng Phúc | 1 |
 | 3 | 3123410387 | Nguyễn Hữu Tri | 1 |
 | 4 | 3123410169 | Nguyễn Đăng Khoa | 1 |
+
 **Đề tài:** Xây dựng Hệ Chuyên Gia Chẩn Đoán Lỗi Máy Tính (Rule-Based Expert System)
 
 ---
