@@ -1,0 +1,649 @@
+{
+  "metadata": {
+    "version": "2.0.0",
+    "name": "PC Diagnostic Expert System Knowledge Base",
+    "description": "Rule-based expert system for Windows/PC/Laptop troubleshooting",
+    "inference_strategy": "forward_chaining",
+    "total_questions": 50,
+    "total_rules": 103,
+    "total_diagnoses": 50,
+    "created_for": "SGU - Cong Nghe Tri Thuc",
+    "author": "Expert System Design",
+    "audit_status": "CLEAN",
+    "audit_note": "0 dead-ends, 0 broken refs, 0 unreachable rules — FINAL v2.0"
+  },
+
+  "groups": [
+    { "id": "power_startup",  "name": "Nguồn / Khởi động",         "description": "Lỗi liên quan đến nguồn điện và quá trình POST/boot" },
+    { "id": "display",        "name": "Màn hình / Hiển thị",        "description": "Lỗi hiển thị, màn hình, card đồ họa" },
+    { "id": "os_boot",        "name": "Hệ điều hành / Boot / BSOD", "description": "Lỗi Windows, màn hình xanh, boot loop" },
+    { "id": "network",        "name": "Mạng / Wi-Fi / Internet",     "description": "Lỗi kết nối mạng, Wi-Fi, Internet" },
+    { "id": "audio_camera",   "name": "Âm thanh / Camera / Micro",  "description": "Lỗi âm thanh, camera, microphone" },
+    { "id": "peripherals",    "name": "Thiết bị ngoại vi / USB",    "description": "Lỗi USB, chuột, bàn phím, Bluetooth" },
+    { "id": "performance",    "name": "Hiệu năng / Nhiệt độ",       "description": "Máy chậm, quá nhiệt, malware, RAM" },
+    { "id": "storage",        "name": "Lưu trữ / Ổ đĩa",           "description": "Lỗi HDD/SSD, file system, ổ đĩa đầy" }
+  ],
+
+  "questions": [
+    {
+      "id": "Q01",
+      "text": "Máy tính của bạn đang gặp vấn đề gì chính?",
+      "type": "single_choice",
+      "purpose": "Phân loại nhóm lỗi cấp cao — loại bỏ 7/8 nhánh không liên quan",
+      "options": [
+        { "value": "A", "label": "Máy không bật / không có điện",           "next": "Q02", "sets_group": "power_startup" },
+        { "value": "B", "label": "Vấn đề màn hình / hiển thị",              "next": "Q09", "sets_group": "display" },
+        { "value": "C", "label": "Windows lỗi / BSOD / không vào được",     "next": "Q13", "sets_group": "os_boot" },
+        { "value": "D", "label": "Wi-Fi / mạng / Internet không hoạt động", "next": "Q20", "sets_group": "network" },
+        { "value": "E", "label": "Âm thanh / camera / micro không hoạt động","next": "Q27", "sets_group": "audio_camera" },
+        { "value": "F", "label": "USB / chuột / bàn phím / ngoại vi lỗi",   "next": "Q32", "sets_group": "peripherals" },
+        { "value": "G", "label": "Máy chạy chậm / nóng / quạt ồn",         "next": "Q37", "sets_group": "performance" },
+        { "value": "H", "label": "Vấn đề ổ đĩa / lưu trữ / file",          "next": "Q36", "sets_group": "storage" }
+      ]
+    },
+    {
+      "id": "Q02",
+      "text": "Khi bạn nhấn nút nguồn, điều gì xảy ra?",
+      "type": "single_choice",
+      "purpose": "Phân biệt mức độ lỗi nguồn",
+      "options": [
+        { "value": "A", "label": "Hoàn toàn không có phản ứng gì (đèn không sáng, quạt không quay)", "adds_facts": ["no_power", "fan_not_spinning"], "next": "Q03", "_note": "fan_not_spinning enables R006 bo mạch lỗi" },
+        { "value": "B", "label": "Đèn nguồn sáng nhưng màn hình đen hoàn toàn",       "adds_facts": ["power_led_on","no_display_after_power"], "next": "Q04" },
+        { "value": "C", "label": "Máy chạy bình thường nhưng sau đó tắt đột ngột",   "adds_facts": ["power_led_on","machine_shuts_down_abruptly"], "next": "Q_SHTDN1" },
+        { "value": "D", "label": "Nghe tiếng quạt quay nhưng không lên màn hình",    "adds_facts": ["power_led_on","fan_spinning","no_display_after_power"], "next": "Q04" }
+      ]
+    },
+    {
+      "id": "Q03",
+      "text": "Máy tính của bạn là laptop hay máy bàn (desktop)?",
+      "type": "single_choice",
+      "purpose": "Phân biệt kiến trúc nguồn điện",
+      "options": [
+        { "value": "A", "label": "Laptop",  "adds_facts": ["is_laptop"],    "next": "Q05" },
+        { "value": "B", "label": "Desktop", "adds_facts": ["is_desktop"],   "next": "Q08" }
+      ]
+    },
+    {
+      "id": "Q04",
+      "text": "Khi bật máy, bạn có nghe thấy tiếng 'beep' từ loa/màn hình không?",
+      "type": "single_choice",
+      "purpose": "Phân biệt POST thành công hay thất bại — số beep là mã lỗi BIOS",
+      "options": [
+        { "value": "A", "label": "Không nghe thấy tiếng beep nào",         "adds_facts": ["no_beep"], "next": "Q06" },
+        { "value": "B", "label": "1 tiếng beep ngắn (bình thường)",        "adds_facts": ["single_beep"], "next": "Q09" },
+        { "value": "C", "label": "Nhiều tiếng beep lặp lại",              "adds_facts": ["multiple_beeps"], "next": "Q05" },
+        { "value": "D", "label": "Tiếng beep lạ / dài",                  "adds_facts": ["multiple_beeps"], "next": "Q05" }
+      ]
+    },
+    {
+      "id": "Q05",
+      "text": "Tình trạng pin và sạc của laptop như thế nào?",
+      "type": "single_choice",
+      "purpose": "Phân biệt lỗi pin vs lỗi adapter vs lỗi bo mạch",
+      "options": [
+        { "value": "A", "label": "Đèn sạc không sáng khi cắm adapter",           "adds_facts": ["no_charge","battery_indicator_red"], "triggers_diagnosis": "DIAG_PWR_01" },
+        { "value": "B", "label": "Đèn sạc sáng nhưng pin không tăng",            "adds_facts": ["no_charge"], "triggers_diagnosis": "DIAG_PWR_02" },
+        { "value": "C", "label": "Máy chỉ chạy khi cắm điện, không chạy bằng pin","adds_facts": ["laptop_only_on_adapter"], "triggers_diagnosis": "DIAG_PWR_02" },
+        { "value": "D", "label": "Adapter nóng bất thường hoặc có mùi khét",     "adds_facts": ["no_charge","battery_indicator_red"], "triggers_diagnosis": "DIAG_PWR_01" }
+      ]
+    },
+    {
+      "id": "Q06",
+      "text": "Bạn đã thử tháo pin, giữ nút nguồn 30 giây rồi cắm lại chưa?",
+      "type": "yes_no",
+      "purpose": "Loại bỏ lỗi tĩnh điện đơn giản",
+      "options": [
+        { "value": "YES", "label": "Đã thử, vẫn không lên",  "next": "Q07" },
+        { "value": "NO",  "label": "Chưa thử",               "suggest_action": "basic_power_reset", "next": "Q07" }
+      ]
+    },
+    {
+      "id": "Q07",
+      "text": "Điều gì xảy ra khi bạn rút hết thiết bị ngoại vi và thử bật lại?",
+      "type": "single_choice",
+      "purpose": "Loại bỏ thiết bị ngoại vi gây lỗi",
+      "options": [
+        { "value": "A", "label": "Máy bật được bình thường",          "triggers_diagnosis": "DIAG_PER_EXT_01" },
+        { "value": "B", "label": "Vẫn không bật được",               "adds_facts": ["no_power"], "next": "Q08" },
+        { "value": "C", "label": "Bật nhưng vẫn không có màn hình",  "adds_facts": ["no_display_after_power"], "next": "Q09" }
+      ]
+    },
+    {
+      "id": "Q08",
+      "text": "Bạn có thể kiểm tra các điều sau về nguồn điện không? (Chọn tất cả điều đúng, rồi bấm Tiếp theo)",
+      "type": "multi_choice",
+      "purpose": "Thu thập nhiều facts về nguồn — PSU vs bo mạch",
+      "_note": "Engine phải collect tất cả lựa chọn, add facts, chạy inference cycle, rồi dùng SUBMIT để tiếp tục",
+      "options": [
+        { "value": "A", "label": "Đã thử ổ điện khác — vẫn không lên",          "adds_facts": ["power_outlet_ok"] },
+        { "value": "B", "label": "Đèn LED trên bo mạch chủ không sáng",         "adds_facts": ["no_mobo_led"] },
+        { "value": "C", "label": "PSU/adapter đã kiểm tra là hoạt động tốt",    "adds_facts": ["psu_tested_ok"] },
+        { "value": "D", "label": "Có tiếng 'tích' nhỏ khi cắm điện",           "adds_facts": ["click_on_power"] },
+        { "value": "SUBMIT", "label": "▶ Đã chọn xong — Phân tích kết quả",   "next": "Q_Q08_RESULT" }
+      ]
+    },
+    {
+      "id": "Q_Q08_RESULT",
+      "text": "Dựa trên thông tin bạn cung cấp, hệ thống đề xuất kiểm tra thêm. Đèn nguồn đã từng nháy khi cắm điện chưa?",
+      "type": "single_choice",
+      "group": "power_startup",
+      "purpose": "Phân biệt PSU hỏng hoàn toàn vs bo mạch chủ lỗi",
+      "options": [
+        { "value": "A", "label": "Đèn nguồn nháy nhẹ rồi tắt ngay",   "adds_facts": ["power_led_on"], "triggers_diagnosis": "DIAG_PWR_04" },
+        { "value": "B", "label": "Không có phản ứng gì khi cắm điện",  "adds_facts": ["no_power"], "triggers_diagnosis": "DIAG_PWR_03" },
+        { "value": "C", "label": "Tiếng kêu + đèn không sáng",          "adds_facts": ["no_power", "click_on_power"], "triggers_diagnosis": "DIAG_PWR_03" }
+      ]
+    },
+    {
+      "id": "Q09",
+      "text": "Vấn đề màn hình bạn đang gặp là gì?",
+      "type": "single_choice",
+      "purpose": "Phân loại chính xác loại lỗi màn hình",
+      "options": [
+        { "value": "A", "label": "Màn hình đen hoàn toàn",          "adds_facts": ["screen_black"], "next": "Q10" },
+        { "value": "B", "label": "Màn hình nhấp nháy / giật",       "adds_facts": ["screen_flickering"], "next": "Q11" },
+        { "value": "C", "label": "Xuất hiện sọc ngang hoặc dọc",    "adds_facts": ["screen_lines"], "next": "Q12" },
+        { "value": "D", "label": "Màu sắc bị lạ / sai màu",        "adds_facts": ["screen_color_distorted"], "next": "Q12" },
+        { "value": "E", "label": "Màn hình trắng hoàn toàn",       "adds_facts": ["screen_white"], "next": "Q10" },
+        { "value": "F", "label": "Độ phân giải / kích thước sai",   "adds_facts": ["resolution_wrong"], "next": "Q11" }
+      ]
+    },
+    {
+      "id": "Q10",
+      "text": "Bạn có thể kết nối màn hình ngoài (qua HDMI/VGA) để kiểm tra không?",
+      "type": "single_choice",
+      "purpose": "Phân biệt lỗi màn hình nội bộ vs GPU",
+      "options": [
+        { "value": "A", "label": "Màn hình ngoài hiển thị bình thường",     "adds_facts": ["external_monitor_ok","system_boots_no_display"], "next": "Q12" },
+        { "value": "B", "label": "Màn hình ngoài cũng đen / cùng vấn đề",  "adds_facts": ["external_monitor_same_issue"], "next": "Q12" },
+        { "value": "C", "label": "Không có cổng/cáp HDMI để kiểm tra",     "next": "Q11" }
+      ]
+    },
+    {
+      "id": "Q11",
+      "text": "Khi nào màn hình bắt đầu gặp vấn đề này?",
+      "type": "single_choice",
+      "purpose": "Xác định nguyên nhân gốc dựa trên thời điểm xuất hiện lỗi",
+      "options": [
+        { "value": "A", "label": "Sau khi cài hoặc cập nhật driver màn hình/GPU", "adds_facts": ["display_after_driver_install"], "triggers_diagnosis": "DIAG_DSP_02" },
+        { "value": "B", "label": "Sau khi Windows Update",                        "adds_facts": ["display_after_driver_install","recent_windows_update"], "triggers_diagnosis": "DIAG_DSP_02" },
+        { "value": "C", "label": "Máy bị va đập / rơi",                          "adds_facts": ["physical_impact_suspected"], "triggers_diagnosis": "DIAG_DSP_03" },
+        { "value": "D", "label": "Tự nhiên xuất hiện",                           "adds_facts": ["screen_flickering"], "next": "Q12" },
+        { "value": "E", "label": "Từ khi mua máy",                              "adds_facts": ["physical_impact_suspected"], "triggers_diagnosis": "DIAG_DSP_03" }
+      ]
+    },
+    {
+      "id": "Q12",
+      "text": "Thử nhìn nghiêng màn hình — có thấy hình mờ mờ không?",
+      "type": "single_choice",
+      "purpose": "Phân biệt backlight hỏng vs panel thực sự đen",
+      "options": [
+        { "value": "A", "label": "Màn hình hoàn toàn đen, không thấy gì kể cả nhìn nghiêng", "triggers_diagnosis": "DIAG_DSP_04" },
+        { "value": "B", "label": "Nhìn nghiêng thấy hình mờ mờ (backlight tắt)",             "adds_facts": ["backlight_fail","brightness_too_low"], "triggers_diagnosis": "DIAG_DSP_03" },
+        { "value": "C", "label": "Màn hình sáng bình thường nhưng quá tối",                  "adds_facts": ["brightness_too_low"], "triggers_diagnosis": "DIAG_DSP_05" },
+        { "value": "D", "label": "Phím tắt độ sáng có vẻ bị kẹt",                           "triggers_diagnosis": "DIAG_DSP_05" }
+      ]
+    },
+    {
+      "id": "Q13",
+      "text": "Vấn đề hệ điều hành bạn đang gặp là gì?",
+      "type": "single_choice",
+      "purpose": "Phân loại chính xác loại lỗi OS",
+      "options": [
+        { "value": "A", "label": "Màn hình xanh chết chóc (BSOD)",                   "adds_facts": ["bsod_appears"], "next": "Q14" },
+        { "value": "B", "label": "Máy khởi động lại liên tục (boot loop)",            "adds_facts": ["boot_loop"], "next": "Q17" },
+        { "value": "C", "label": "Máy dừng ở màn hình logo, không vào được Windows", "adds_facts": ["stuck_at_logo"], "next": "Q16" },
+        { "value": "D", "label": "Windows load xong nhưng bị treo / đứng màn hình", "adds_facts": ["os_freezes_randomly"], "next": "Q17" },
+        { "value": "E", "label": "Không vào được Windows, màn hình đen sau logo",    "adds_facts": ["windows_not_loading"], "next": "Q16" }
+      ]
+    },
+    {
+      "id": "Q14",
+      "text": "Màn hình BSOD hiển thị mã lỗi gì?",
+      "type": "single_choice",
+      "purpose": "Mã lỗi BSOD trực tiếp chỉ ra nguyên nhân",
+      "options": [
+        { "value": "A", "label": "MEMORY_MANAGEMENT / PAGE_FAULT / IRQL_NOT_LESS_OR_EQUAL", "adds_facts": ["bsod_memory_error"], "next": "Q19" },
+        { "value": "B", "label": "DRIVER_IRQL / SYSTEM_SERVICE_EXCEPTION / DRIVER_POWER",  "adds_facts": ["bsod_driver_error"], "next": "Q17" },
+        { "value": "C", "label": "CRITICAL_PROCESS_DIED / NTFS_FILE_SYSTEM / INACCESSIBLE_BOOT", "adds_facts": ["bsod_disk_error"], "next": "Q19" },
+        { "value": "D", "label": "Không kịp đọc / không có mã lỗi",                        "next": "Q15" },
+        { "value": "E", "label": "Mã lỗi khác",                                             "next": "Q17" }
+      ]
+    },
+    {
+      "id": "Q15",
+      "text": "BSOD xảy ra khi nào?",
+      "type": "single_choice",
+      "purpose": "Thời điểm BSOD giúp thu hẹp nguyên nhân",
+      "options": [
+        { "value": "A", "label": "Ngay khi bật máy / trong lúc boot",         "triggers_diagnosis": "DIAG_OS_04" },
+        { "value": "B", "label": "Khi chạy game hoặc ứng dụng nặng",         "adds_facts": ["bsod_memory_error"], "next": "Q19" },
+        { "value": "C", "label": "Khi cắm/rút thiết bị USB",                 "adds_facts": ["bsod_driver_error"], "triggers_diagnosis": "DIAG_PER_02" },
+        { "value": "D", "label": "Ngẫu nhiên, không có pattern",              "adds_facts": ["bsod_memory_error"], "triggers_diagnosis": "DIAG_OS_03" },
+        { "value": "E", "label": "Sau khi cài phần mềm/driver cụ thể",       "adds_facts": ["bsod_driver_error","recent_software_install"], "triggers_diagnosis": "DIAG_OS_02" }
+      ]
+    },
+    {
+      "id": "Q16",
+      "text": "Bạn có thể vào Windows ở chế độ Safe Mode không? (F8 khi khởi động)",
+      "type": "single_choice",
+      "purpose": "Safe Mode xác nhận lỗi driver hay OS corruption",
+      "options": [
+        { "value": "A", "label": "Có, Safe Mode hoạt động bình thường",    "adds_facts": ["safe_mode_works"], "next": "Q17" },
+        { "value": "B", "label": "Không, Safe Mode cũng bị lỗi",          "adds_facts": ["safe_mode_fails"], "triggers_diagnosis": "DIAG_OS_01" },
+        { "value": "C", "label": "Không biết cách vào Safe Mode",         "suggest_action": "guide_safe_mode", "next": "Q17" }
+      ]
+    },
+    {
+      "id": "Q17",
+      "text": "Sự kiện nào xảy ra TRƯỚC KHI máy bắt đầu gặp lỗi? (Chọn tất cả điều đúng)",
+      "type": "multi_choice",
+      "purpose": "Xác định nguyên nhân dựa trên thay đổi gần đây — engine chạy rules sau khi collect facts",
+      "_note": "Engine add tất cả facts → run inference → SUBMIT điều hướng tiếp",
+      "options": [
+        { "value": "A", "label": "Vừa cài phần mềm mới",                    "adds_facts": ["recent_software_install", "recent_change_caused_issue"] },
+        { "value": "B", "label": "Vừa cập nhật Windows",                    "adds_facts": ["recent_windows_update", "recent_change_caused_issue"] },
+        { "value": "C", "label": "Vừa cập nhật driver màn hình/âm thanh", "adds_facts": ["recent_driver_update", "recent_change_caused_issue"] },
+        { "value": "D", "label": "Máy bị nhiễm virus/malware",             "adds_facts": ["malware_suspected"] },
+        { "value": "E", "label": "Không có thay đổi nào gần đây",          "adds_facts": ["no_recent_change"] },
+        { "value": "F", "label": "Vừa cài lại Windows",                    "adds_facts": ["fresh_windows_install"] },
+        { "value": "SUBMIT", "label": "▶ Đã chọn xong — Phân tích kết quả", "next": "Q18" }
+      ]
+    },
+    {
+      "id": "Q18",
+      "text": "Có System Restore point hoặc backup gần đây không?",
+      "type": "yes_no",
+      "purpose": "Xác định khả năng recovery",
+      "options": [
+        { "value": "YES", "label": "Có restore point",  "adds_facts": ["system_restore_available"], "suggest_action": "system_restore", "next": "Q19" },
+        { "value": "NO",  "label": "Không có",          "next": "Q19" }
+      ]
+    },
+    {
+      "id": "Q19",
+      "text": "Bạn có thể chạy công cụ chẩn đoán nào sau đây không?",
+      "type": "single_choice",
+      "purpose": "Thu thập kết quả từ công cụ hệ thống",
+      "options": [
+        { "value": "A", "label": "Windows Memory Diagnostic báo LỖI",     "adds_facts": ["bsod_memory_error"], "triggers_diagnosis": "DIAG_OS_03" },
+        { "value": "B", "label": "CHKDSK tìm thấy bad sectors",           "adds_facts": ["chkdsk_errors","bad_sectors_detected"], "triggers_diagnosis": "DIAG_STR_02" },
+        { "value": "C", "label": "SFC /scannow tìm thấy file lỗi",       "adds_facts": ["sfc_errors_found"], "triggers_diagnosis": "DIAG_OS_01" },
+        { "value": "D", "label": "Tất cả công cụ báo bình thường",        "adds_facts": ["no_tool_errors"], "triggers_diagnosis": "DIAG_NEED_TECH" },
+        { "value": "E", "label": "Không biết cách chạy các công cụ",      "suggest_action": "guide_diagnostic_tools", "next": "Q19_RETRY" }
+      ]
+    },
+    {
+      "id": "Q19_RETRY",
+      "text": "Sau khi xem hướng dẫn — bạn đã chạy được công cụ chẩn đoán chưa?",
+      "type": "single_choice",
+      "group": "os_boot",
+      "purpose": "Sau khi guide, user quay lại kiểm tra — tránh vòng lặp Q19→E→Q19",
+      "options": [
+        { "value": "YES", "label": "Đã chạy được — quay lại xem kết quả", "next": "Q19" },
+        { "value": "NO",  "label": "Chưa chạy được",                      "triggers_diagnosis": "DIAG_NEED_TECH" }
+      ]
+    },
+    {
+      "id": "Q20",
+      "text": "Vấn đề mạng bạn đang gặp là gì?",
+      "type": "single_choice",
+      "purpose": "Phân biệt không thấy Wi-Fi vs không có Internet vs chậm",
+      "options": [
+        { "value": "A", "label": "Không thấy bất kỳ mạng Wi-Fi nào",              "adds_facts": ["wifi_not_visible"], "next": "Q25" },
+        { "value": "B", "label": "Kết nối Wi-Fi nhưng không vào được Internet",    "adds_facts": ["wifi_connected_no_internet"], "next": "Q21" },
+        { "value": "C", "label": "Wi-Fi có dấu chấm than vàng",                   "adds_facts": ["wifi_connected_yellow_exclamation"], "next": "Q22" },
+        { "value": "D", "label": "Mạng rất chậm dù tín hiệu tốt",                "adds_facts": ["wifi_slow"], "next": "Q22" },
+        { "value": "E", "label": "Mạng bị ngắt kết nối liên tục",                "adds_facts": ["wifi_connected_no_internet"], "next": "Q22" }
+      ]
+    },
+    {
+      "id": "Q21",
+      "text": "Thử cắm cáp mạng (LAN/Ethernet) vào máy — kết quả thế nào?",
+      "type": "single_choice",
+      "purpose": "Phân biệt lỗi Wi-Fi adapter vs lỗi mạng tổng quát",
+      "options": [
+        { "value": "A", "label": "Cắm cáp mạng → có Internet bình thường", "adds_facts": ["ethernet_works"], "next": "Q25" },
+        { "value": "B", "label": "Cắm cáp mạng cũng không có Internet",    "adds_facts": ["ethernet_no_internet"], "next": "Q22" },
+        { "value": "C", "label": "Không có cáp mạng để thử",               "next": "Q22" }
+      ]
+    },
+    {
+      "id": "Q22",
+      "text": "Các thiết bị khác dùng cùng Wi-Fi có vào Internet được không?",
+      "type": "single_choice",
+      "purpose": "Phân biệt lỗi ở máy tính vs lỗi ở router/ISP",
+      "options": [
+        { "value": "A", "label": "Có, thiết bị khác bình thường",     "adds_facts": ["other_devices_same_wifi_ok"], "next": "Q23" },
+        { "value": "B", "label": "Không, tất cả đều không vào được", "adds_facts": ["other_devices_same_wifi_fail"], "triggers_diagnosis": "DIAG_NET_04" },
+        { "value": "C", "label": "Chỉ có một thiết bị",              "next": "Q23" }
+      ]
+    },
+    {
+      "id": "Q23",
+      "text": "Trình duyệt báo lỗi gì khi không vào được Internet?",
+      "type": "single_choice",
+      "purpose": "Thông báo lỗi trình duyệt là manh mối về nguyên nhân",
+      "options": [
+        { "value": "A", "label": "DNS_PROBE_FINISHED_NXDOMAIN hoặc lỗi DNS",    "adds_facts": ["dns_error_message"], "triggers_diagnosis": "DIAG_NET_03" },
+        { "value": "B", "label": "ERR_CONNECTION_TIMED_OUT",                    "next": "Q24" },
+        { "value": "C", "label": "ERR_NETWORK_CHANGED",                         "adds_facts": ["ip_conflict"], "triggers_diagnosis": "DIAG_NET_06" },
+        { "value": "D", "label": "Chỉ một số website không vào được",           "adds_facts": ["specific_sites_blocked"], "next": "Q24" },
+        { "value": "E", "label": "Không có thông báo lỗi",                      "next": "Q25" }
+      ]
+    },
+    {
+      "id": "Q24",
+      "text": "Máy tính có đang sử dụng VPN, proxy hoặc phần mềm bảo mật không?",
+      "type": "yes_no",
+      "purpose": "VPN/Proxy thường gây lỗi mạng",
+      "options": [
+        { "value": "YES", "label": "Có dùng VPN hoặc proxy",  "adds_facts": ["vpn_related"], "suggest_action": "disable_vpn_test", "triggers_diagnosis": "DIAG_NET_06" },
+        { "value": "NO",  "label": "Không dùng",              "next": "Q25" }
+      ]
+    },
+    {
+      "id": "Q25",
+      "text": "Trong Device Manager, Wi-Fi adapter có hiển thị không?",
+      "type": "single_choice",
+      "purpose": "Xác định lỗi phần cứng adapter vs lỗi driver",
+      "options": [
+        { "value": "A", "label": "Không thấy Wi-Fi adapter",               "adds_facts": ["wifi_adapter_missing"], "triggers_diagnosis": "DIAG_NET_02" },
+        { "value": "B", "label": "Thấy adapter nhưng có dấu chấm than",   "triggers_diagnosis": "DIAG_NET_01" },
+        { "value": "C", "label": "Adapter hiển thị bình thường",            "next": "Q23" },
+        { "value": "D", "label": "Không biết mở Device Manager",           "suggest_action": "guide_device_manager", "next": "Q23" }
+      ]
+    },
+    {
+      "id": "Q26",
+      "text": "Thử chạy 'ipconfig /release' rồi 'ipconfig /renew' trong CMD — kết quả?",
+      "type": "single_choice",
+      "purpose": "Xác định lỗi DHCP/IP configuration",
+      "options": [
+        { "value": "A", "label": "Sau khi chạy lệnh, Internet hoạt động",   "triggers_diagnosis": "DIAG_NET_06" },
+        { "value": "B", "label": "Lệnh báo lỗi không lấy được IP",          "triggers_diagnosis": "DIAG_NET_05" },
+        { "value": "C", "label": "Không thay đổi gì",                       "triggers_diagnosis": "DIAG_NET_05" },
+        { "value": "D", "label": "Không biết cách chạy lệnh CMD",           "suggest_action": "guide_cmd_ipconfig", "triggers_diagnosis": "DIAG_NET_05" }
+      ]
+    },
+    {
+      "id": "Q27",
+      "text": "Thiết bị nào đang gặp vấn đề?",
+      "type": "single_choice",
+      "purpose": "Phân biệt lỗi âm thanh vs micro vs camera",
+      "options": [
+        { "value": "A", "label": "Không có âm thanh từ loa",               "adds_facts": ["no_sound"], "next": "Q28" },
+        { "value": "B", "label": "Microphone không hoạt động",             "adds_facts": ["microphone_not_working"], "next": "Q31" },
+        { "value": "C", "label": "Camera không được nhận",                 "adds_facts": ["camera_not_detected"], "next": "Q30" },
+        { "value": "D", "label": "Cả loa lẫn micro đều lỗi",              "adds_facts": ["no_sound","microphone_not_working"], "next": "Q28" },
+        { "value": "E", "label": "Tai nghe/headset không hoạt động",      "adds_facts": ["audio_works_headphone_not"], "next": "Q29" }
+      ]
+    },
+    {
+      "id": "Q28",
+      "text": "Về vấn đề âm thanh — bạn kiểm tra thấy điều gì?",
+      "type": "single_choice",
+      "purpose": "Thu hẹp nguyên nhân lỗi âm thanh",
+      "options": [
+        { "value": "A", "label": "Không thấy thiết bị âm thanh trong Device Manager",  "adds_facts": ["audio_device_missing"], "triggers_diagnosis": "DIAG_AUD_03" },
+        { "value": "B", "label": "Thiết bị âm thanh có dấu chấm than vàng",            "adds_facts": ["audio_driver_yellow_mark"], "triggers_diagnosis": "DIAG_AUD_01" },
+        { "value": "C", "label": "Thanh âm lượng ở 0 hoặc bị mute",                   "triggers_diagnosis": "DIAG_AUD_02" },
+        { "value": "D", "label": "Loa OK nhưng cắm tai nghe không có tiếng",           "adds_facts": ["audio_works_headphone_not"], "next": "Q29" },
+        { "value": "E", "label": "Âm thanh bị rè, nhiễu, méo",                         "adds_facts": ["sound_quality_bad"], "next": "Q29" }
+      ]
+    },
+    {
+      "id": "Q29",
+      "text": "Âm thanh có bao giờ hoạt động sau khi restart không?",
+      "type": "single_choice",
+      "purpose": "Lỗi tạm thời gợi ý driver, lỗi cố định gợi ý hardware",
+      "options": [
+        { "value": "A", "label": "Sau restart thì có âm thanh trong ít phút rồi mất",  "adds_facts": ["audio_works_after_restart"], "triggers_diagnosis": "DIAG_AUD_01" },
+        { "value": "B", "label": "Sau restart vẫn không có âm thanh",                  "next": "Q28" },
+        { "value": "C", "label": "Chưa bao giờ có âm thanh (máy mới)",                "triggers_diagnosis": "DIAG_AUD_01" },
+        { "value": "D", "label": "Vừa cập nhật Windows/driver rồi mất âm thanh",      "adds_facts": ["audio_driver_yellow_mark","recent_change_caused_issue"], "triggers_diagnosis": "DIAG_AUD_01" }
+      ]
+    },
+    {
+      "id": "Q30",
+      "text": "Về vấn đề camera — bạn kiểm tra thấy điều gì?",
+      "type": "single_choice",
+      "purpose": "Phân biệt privacy vs driver vs hardware camera",
+      "options": [
+        { "value": "A", "label": "Camera bị chặn trong Windows Settings > Privacy", "adds_facts": ["camera_privacy_blocked"], "triggers_diagnosis": "DIAG_CAM_01" },
+        { "value": "B", "label": "Camera hiển thị trong Device Manager nhưng lỗi", "adds_facts": ["camera_driver_error"], "triggers_diagnosis": "DIAG_CAM_02" },
+        { "value": "C", "label": "Camera không hiển thị trong Device Manager",     "adds_facts": ["camera_not_in_dm"], "triggers_diagnosis": "DIAG_CAM_02" },
+        { "value": "D", "label": "Camera hoạt động ở app này nhưng không ở app khác","adds_facts": ["camera_works_some_apps"], "suggest_action": "check_app_permissions", "triggers_diagnosis": "DIAG_CAM_01" },
+        { "value": "E", "label": "Có phần mềm khác đang dùng camera",             "adds_facts": ["camera_in_use_by_app"], "suggest_action": "close_conflicting_apps", "triggers_diagnosis": "DIAG_CAM_01" }
+      ]
+    },
+    {
+      "id": "Q31",
+      "text": "Micro không hoạt động — bạn kiểm tra cài đặt âm thanh thấy gì?",
+      "type": "single_choice",
+      "purpose": "Micro thường bị vô hiệu hóa trong settings hoặc lỗi driver",
+      "options": [
+        { "value": "A", "label": "Micro bị disabled trong Sound Settings",             "adds_facts": ["micro_disabled_in_settings"], "triggers_diagnosis": "DIAG_AUD_02" },
+        { "value": "B", "label": "Micro xuất hiện trong Device Manager nhưng lỗi",    "adds_facts": ["audio_driver_yellow_mark"], "triggers_diagnosis": "DIAG_AUD_01" },
+        { "value": "C", "label": "Micro không xuất hiện trong Sound Devices",         "adds_facts": ["audio_device_missing"], "triggers_diagnosis": "DIAG_AUD_03" },
+        { "value": "D", "label": "Micro hoạt động ở Windows nhưng không ở ứng dụng", "adds_facts": ["micro_app_permission_blocked"], "suggest_action": "check_app_mic_permission", "triggers_diagnosis": "DIAG_CAM_01" }
+      ]
+    },
+    {
+      "id": "Q32",
+      "text": "Thiết bị ngoại vi nào đang gặp vấn đề?",
+      "type": "single_choice",
+      "purpose": "Phân biệt loại thiết bị — cách chẩn đoán khác nhau",
+      "options": [
+        { "value": "A", "label": "Thiết bị USB (flash drive, chuột USB,...)",  "adds_facts": ["usb_not_detected"], "next": "Q33" },
+        { "value": "B", "label": "Chuột không hoạt động",                      "adds_facts": ["mouse_not_working"], "next": "Q34" },
+        { "value": "C", "label": "Bàn phím không hoạt động",                  "adds_facts": ["keyboard_not_working"], "next": "Q34" },
+        { "value": "D", "label": "Bluetooth không kết nối được",               "adds_facts": ["bluetooth_not_working"], "next": "Q_BT1" },
+        { "value": "E", "label": "Máy in không được nhận",                     "adds_facts": ["printer_not_detected"], "next": "Q35" },
+        { "value": "F", "label": "Touchpad laptop không hoạt động",            "adds_facts": ["touchpad_not_working"], "next": "Q_TOUCH1" }
+      ]
+    },
+    {
+      "id": "Q33",
+      "text": "Vấn đề USB xảy ra ở bao nhiêu cổng?",
+      "type": "single_choice",
+      "purpose": "Phân biệt 1 cổng hỏng vs tất cả cổng hỏng",
+      "options": [
+        { "value": "A", "label": "Chỉ một cổng USB cụ thể bị lỗi",          "adds_facts": ["specific_usb_port_fail"], "next": "Q34" },
+        { "value": "B", "label": "Một số cổng bị lỗi, một số vẫn OK",       "adds_facts": ["specific_usb_port_fail"], "next": "Q34" },
+        { "value": "C", "label": "Tất cả cổng USB đều bị lỗi",              "adds_facts": ["all_usb_ports_fail"], "triggers_diagnosis": "DIAG_PER_02" }
+      ]
+    },
+    {
+      "id": "Q34",
+      "text": "Thiết bị USB hoạt động trên máy khác không?",
+      "type": "single_choice",
+      "purpose": "Phân biệt thiết bị lỗi vs cổng lỗi vs driver lỗi",
+      "options": [
+        { "value": "A", "label": "Thiết bị hoạt động bình thường trên máy khác",  "adds_facts": ["usb_device_works_on_other_pc"], "next": "Q35" },
+        { "value": "B", "label": "Thiết bị cũng lỗi trên máy khác",              "adds_facts": ["usb_device_fails_all_ports"], "triggers_diagnosis": "DIAG_PER_03" },
+        { "value": "C", "label": "Không có máy khác để thử",                     "next": "Q35" }
+      ]
+    },
+    {
+      "id": "Q35",
+      "text": "Trong Device Manager, thiết bị ngoại vi hiển thị thế nào?",
+      "type": "single_choice",
+      "purpose": "Device Manager phản ánh trạng thái driver và nhận dạng thiết bị",
+      "options": [
+        { "value": "A", "label": "Có biểu tượng dấu chấm than vàng",              "adds_facts": ["usb_device_error"], "triggers_diagnosis": "DIAG_PER_04" },
+        { "value": "B", "label": "Thiết bị không xuất hiện trong Device Manager", "adds_facts": ["usb_not_in_dm"], "triggers_diagnosis": "DIAG_PER_01" },
+        { "value": "C", "label": "Xuất hiện dưới 'Unknown Device'",              "adds_facts": ["usb_unknown_device"], "triggers_diagnosis": "DIAG_PER_04" },
+        { "value": "D", "label": "Thiết bị hiển thị bình thường",                "adds_facts": ["peripheral_software_issue"], "suggest_action": "check_device_software", "triggers_diagnosis": "DIAG_PER_04" }
+      ]
+    },
+    {
+      "id": "Q36",
+      "text": "Vấn đề ổ đĩa/lưu trữ bạn đang gặp là gì?",
+      "type": "single_choice",
+      "purpose": "Phân biệt đầy ổ đĩa vs HDD hỏng vs file system lỗi",
+      "options": [
+        { "value": "A", "label": "Ổ C: gần đầy, máy chạy chậm",                   "adds_facts": ["disk_full"], "triggers_diagnosis": "DIAG_STR_01" },
+        { "value": "B", "label": "HDD phát ra tiếng click lách cách",             "adds_facts": ["disk_error_sound"], "triggers_diagnosis": "DIAG_STR_02" },
+        { "value": "C", "label": "File bị hỏng, không mở được",                   "adds_facts": ["file_corruption"], "next": "Q19" },
+        { "value": "D", "label": "CHKDSK báo lỗi bad sectors",                    "adds_facts": ["chkdsk_errors","bad_sectors_detected"], "triggers_diagnosis": "DIAG_STR_02" },
+        { "value": "E", "label": "Ổ đĩa thứ 2 không hiển thị trong My Computer", "adds_facts": ["disk_not_detected"], "triggers_diagnosis": "DIAG_STR_04" },
+        { "value": "F", "label": "SSD: CrystalDiskInfo báo health thấp (<80%)",   "adds_facts": ["ssd_health_low"], "triggers_diagnosis": "DIAG_STR_03" }
+      ]
+    },
+    {
+      "id": "Q37",
+      "text": "Vấn đề hiệu năng bạn đang gặp là gì?",
+      "type": "single_choice",
+      "purpose": "Phân biệt nguyên nhân chậm — nhiệt độ vs phần mềm vs hardware",
+      "options": [
+        { "value": "A", "label": "Máy rất chậm, nóng, quạt ồn",             "adds_facts": ["system_very_slow","fan_very_loud","laptop_very_hot"], "next": "Q38" },
+        { "value": "B", "label": "Khởi động Windows rất lâu (>3 phút)",     "adds_facts": ["slow_boot_time"], "next": "Q39" },
+        { "value": "C", "label": "Chậm khi mở nhiều ứng dụng cùng lúc",     "adds_facts": ["system_very_slow"], "next": "Q38" },
+        { "value": "D", "label": "Chỉ chậm ở một số ứng dụng cụ thể",      "adds_facts": ["slow_only_specific_apps"], "suggest_action": "app_specific_check", "triggers_diagnosis": "DIAG_NEED_TECH" },
+        { "value": "E", "label": "Copy/đọc file rất chậm",                  "adds_facts": ["slow_file_transfer"], "next": "Q36" }
+      ]
+    },
+    {
+      "id": "Q38",
+      "text": "Mở Task Manager — tài nguyên nào đang ở mức cao? (Chọn tất cả điều đúng)",
+      "type": "multi_choice",
+      "purpose": "Task Manager cung cấp dữ liệu thực tế về bottleneck — mỗi option add fact, SUBMIT kích hoạt inference",
+      "options": [
+        { "value": "A", "label": "CPU: luôn ở 90-100%",              "adds_facts": ["high_cpu_usage"] },
+        { "value": "B", "label": "Memory/RAM: gần đầy (>85%)",       "adds_facts": ["high_memory_usage"] },
+        { "value": "C", "label": "Disk: luôn ở 100%",               "adds_facts": ["high_disk_usage"] },
+        { "value": "D", "label": "GPU: luôn ở 90-100%",             "adds_facts": ["high_gpu_usage"] },
+        { "value": "E", "label": "Tất cả bình thường / không rõ cao cái gì", "adds_facts": ["resource_usage_normal"] },
+        { "value": "SUBMIT", "label": "▶ Đã chọn xong — Phân tích", "next": "Q40" }
+      ]
+    },
+    {
+      "id": "Q39",
+      "text": "Máy tính có dấu hiệu nào sau đây không? (Chọn tất cả điều đúng)",
+      "type": "multi_choice",
+      "purpose": "Phân biệt malware vs startup bloat vs thiếu tài nguyên — engine chạy inference sau khi collect facts",
+      "options": [
+        { "value": "A", "label": "Chậm ngay từ khi bật máy",                          "adds_facts": ["startup_programs_many", "slow_boot_time"] },
+        { "value": "B", "label": "Thấy nhiều chương trình không rõ trong Task Manager","adds_facts": ["malware_suspected"] },
+        { "value": "C", "label": "Phần mềm diệt virus phát hiện mối đe dọa",         "adds_facts": ["malware_suspected"] },
+        { "value": "D", "label": "Chậm hơn hẳn so với vài tháng trước",              "adds_facts": ["performance_degraded_over_time"] },
+        { "value": "E", "label": "Đã lâu không restart/shutdown đúng cách",           "adds_facts": ["no_recent_restart"], "suggest_action": "restart_first" },
+        { "value": "SUBMIT", "label": "▶ Đã chọn xong — Phân tích",                 "next": "Q40" }
+      ]
+    },
+    {
+      "id": "Q40",
+      "text": "Về nhiệt độ và tản nhiệt — bạn kiểm tra thấy gì?",
+      "type": "single_choice",
+      "purpose": "Quá nhiệt là nguyên nhân chính gây chậm laptop",
+      "options": [
+        { "value": "A", "label": "Máy nóng rất nhiều ở đáy laptop",                 "adds_facts": ["laptop_very_hot"], "triggers_diagnosis": "DIAG_PERF_01" },
+        { "value": "B", "label": "Quạt kêu to nhưng máy vẫn nóng",                "adds_facts": ["fan_very_loud","laptop_very_hot"], "triggers_diagnosis": "DIAG_PERF_01" },
+        { "value": "C", "label": "Máy dùng lâu (>2 năm) chưa bao giờ vệ sinh",   "adds_facts": ["dust_in_vents","thermal_paste_old"], "triggers_diagnosis": "DIAG_PERF_01" },
+        { "value": "D", "label": "HWMonitor báo CPU >90°C khi load",               "adds_facts": ["laptop_very_hot","high_cpu_usage"], "triggers_diagnosis": "DIAG_PERF_01" },
+        { "value": "E", "label": "Nhiệt độ bình thường nhưng vẫn chậm",           "next": "Q39" }
+      ]
+    },
+    {
+      "id": "Q_BT1",
+      "text": "Kiểm tra Bluetooth trên máy — bạn thấy điều gì?",
+      "type": "single_choice",
+      "group": "peripherals",
+      "purpose": "Phân biệt Bluetooth tắt vs driver lỗi vs adapter hardware hỏng",
+      "options": [
+        { "value": "A", "label": "Bluetooth bịt nhưng không pair được với thiết bị",   "adds_facts": ["bt_on_pair_fail"], "next": "Q_BT2" },
+        { "value": "B", "label": "Không thấy icon Bluetooth / Bluetooth switch bị tắt", "adds_facts": ["bt_toggle_off"], "triggers_diagnosis": "DIAG_BT_01" },
+        { "value": "C", "label": "Bluetooth adapter không hiển thị trong Device Manager",  "adds_facts": ["bt_adapter_missing"], "triggers_diagnosis": "DIAG_BT_02" },
+        { "value": "D", "label": "Bluetooth bật nhưng không tìm thấy thiết bị nào khi scan", "adds_facts": ["bt_no_devices_found"], "next": "Q_BT2" }
+      ]
+    },
+    {
+      "id": "Q_BT2",
+      "text": "Thiết bị Bluetooth (tai nghe, chuột...) có từ ng được kết nối với máy này không?",
+      "type": "single_choice",
+      "group": "peripherals",
+      "purpose": "Phân biệt xung đột pairing vs driver hỏng",
+      "options": [
+        { "value": "A", "label": "Từ ng hoạt động tốt, tự nhiên mất kết nối ổn định", "adds_facts": ["bt_was_working", "bt_unstable_connection"], "triggers_diagnosis": "DIAG_BT_03" },
+        { "value": "B", "label": "Pair được nhưng mất kết nối liên tục",   "adds_facts": ["bt_unstable_connection"], "triggers_diagnosis": "DIAG_BT_03" },
+        { "value": "C", "label": "Chưa bao giờ pair được",                  "adds_facts": ["bt_never_paired"], "triggers_diagnosis": "DIAG_BT_02" },
+        { "value": "D", "label": "Sau khi Windows Update thì mất Bluetooth",  "adds_facts": ["bt_stopped_after_update", "recent_windows_update"], "triggers_diagnosis": "DIAG_BT_02" }
+      ]
+    },
+    {
+      "id": "Q_TOUCH1",
+      "text": "Touchpad laptop không hoạt động — bạn kiểm tra thấy gì?",
+      "type": "single_choice",
+      "group": "peripherals",
+      "purpose": "Phân biệt touchpad bị tắt phím tắt vs driver lỗi vs hardware hỏng",
+      "options": [
+        { "value": "A", "label": "Phím tắt touchpad bị nhấn (Fn + phím touchpad, đèn đỏ)", "adds_facts": ["touchpad_hotkey_disabled"], "triggers_diagnosis": "DIAG_TOUCH_01" },
+        { "value": "B", "label": "Touchpad có dấu chấm than trong Device Manager",             "adds_facts": ["touchpad_driver_error"], "next": "Q_TOUCH2" },
+        { "value": "C", "label": "Touchpad không xuất hiện trong Device Manager",              "adds_facts": ["touchpad_not_detected_hw"], "triggers_diagnosis": "DIAG_TOUCH_02" },
+        { "value": "D", "label": "Touchpad bị tắt trong Settings (Bluetooth & devices)",     "adds_facts": ["touchpad_disabled_settings"], "triggers_diagnosis": "DIAG_TOUCH_01" }
+      ]
+    },
+    {
+      "id": "Q_TOUCH2",
+      "text": "Touchpad có từng hoạt động trên máy này trước đây không?",
+      "type": "single_choice",
+      "group": "peripherals",
+      "purpose": "Phân biệt lỗi driver mới vs hỏng phần cứng",
+      "options": [
+        { "value": "A", "label": "Hoạt động tốt trước đây, tự nhiên không hoạt động",        "adds_facts": ["touchpad_was_working"], "triggers_diagnosis": "DIAG_TOUCH_01" },
+        { "value": "B", "label": "Mất sau khi Windows Update hoặc cài driver mới",          "adds_facts": ["touchpad_was_working", "recent_windows_update"], "triggers_diagnosis": "DIAG_TOUCH_01" },
+        { "value": "C", "label": "Từ khi mua máy chưa bao giờ hoạt động được",              "adds_facts": ["touchpad_never_worked"], "triggers_diagnosis": "DIAG_TOUCH_02" }
+      ]
+    },
+    {
+      "id": "Q_SHTDN1",
+      "text": "Máy tắt đột ngột theo kiểu nào?",
+      "type": "single_choice",
+      "group": "power_startup",
+      "purpose": "Phân biệt quá nhiệt vs lỗi điện vs lỗi phần cứng khác",
+      "options": [
+        { "value": "A", "label": "Tắt khi chạy nặng (game, render video)",       "adds_facts": ["shuts_under_load"], "next": "Q_SHTDN2" },
+        { "value": "B", "label": "Tắt ngẫu nhiên kể cả khi nhàn rỗi",           "adds_facts": ["shuts_randomly"], "next": "Q_SHTDN2" },
+        { "value": "C", "label": "Tắt khi cắm sạc hoặc tháo sạc (laptop)",        "adds_facts": ["shuts_on_charge_change"], "triggers_diagnosis": "DIAG_SHTDN_02" },
+        { "value": "D", "label": "Tắt sau một khoảng thời gian cố định (v᷑ dụ 30 phút)", "adds_facts": ["shuts_on_timer"], "triggers_diagnosis": "DIAG_SHTDN_01" }
+      ]
+    },
+    {
+      "id": "Q_SHTDN2",
+      "text": "Trước khi tắt, máy có nóng hoặc quạt chạy hết tốc độ không?",
+      "type": "single_choice",
+      "group": "power_startup",
+      "purpose": "Xác nhận Thermal Shutdown vs lỗi PSU/RAM",
+      "options": [
+        { "value": "A", "label": "Có, rất nóng và quạt chạy hết tốc trước khi tắt",   "adds_facts": ["overheats_before_shutdown"], "triggers_diagnosis": "DIAG_SHTDN_01" },
+        { "value": "B", "label": "Không, nhiệt độ bình thường trước khi tắt",           "adds_facts": ["no_thermal_before_shutdown"], "triggers_diagnosis": "DIAG_SHTDN_03" },
+        { "value": "C", "label": "Nguồn điện bị dao động (mất điện, đèn nhấp nháy)",    "adds_facts": ["power_fluctuation"], "triggers_diagnosis": "DIAG_PWR_03" }
+      ]
+    },
+    {
+      "id": "Q_BIOS1",
+      "text": "Ổ đĩa không hiển thị — kiểm tra ở cấp nào?",
+      "type": "single_choice",
+      "group": "storage",
+      "purpose": "Phân biệt không nhận ở BIOS vs không nhận ở Windows",
+      "options": [
+        { "value": "A", "label": "Ổ không hiển thị trong BIOS/UEFI (kiểm tra trước khi vào Windows)", "adds_facts": ["disk_not_in_bios"], "next": "Q_BIOS2" },
+        { "value": "B", "label": "Hiển thị trong BIOS nhưng không thấy trong Windows Explorer",    "adds_facts": ["disk_in_bios_not_windows"], "next": "Q19" },
+        { "value": "C", "label": "SSD/NVMe mới lắp chưa được nhận",                                  "adds_facts": ["new_disk_not_detected"], "triggers_diagnosis": "DIAG_BIOS_01" }
+      ]
+    },
+    {
+      "id": "Q_BIOS2",
+      "text": "Loại Ổ đĩa và kết nối của bạn là gì?",
+      "type": "single_choice",
+      "group": "storage",
+      "purpose": "Phân biệt SATA vs NVMe để hướng dẫn BIOS setting đúng",
+      "options": [
+        { "value": "A", "label": "HDD hoặc SSD SATA (cáp dây), vừa tháo lắp lại",      "adds_facts": ["sata_disk", "recently_reinstalled"], "triggers_diagnosis": "DIAG_BIOS_01" },
+        { "value": "B", "label": "SSD M.2 NVMe (kích thước nhỏ, cắm thẺ ngọi trên mainboard)", "adds_facts": ["nvme_disk"], "triggers_diagnosis": "DIAG_BIOS_01" },
+        { "value": "C", "label": "Ổ cũ hoạt động tốt, vừa thình lình không nhận",               "adds_facts": ["disk_worked_before"], "triggers_diagnosis": "DIAG_STR_02" }
+      ]
+    }
+  ]
+}

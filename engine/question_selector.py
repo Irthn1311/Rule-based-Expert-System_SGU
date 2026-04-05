@@ -1,115 +1,228 @@
 """
-Question Selector — Smart dynamic question selection.
+Dynamic Question Selector — Chọn câu hỏi thông minh tiếp theo.
 
-Replaces static QuestionFlow with intelligent question selection
-based on backward chaining analysis. Selects the MOST INFORMATIVE
-question to ask next.
-
-Algorithm:
-1. Get missing conditions from backward chaining
-2. Score each condition by frequency across candidate rules
-3. Select highest-score condition (most discriminating)
-4. Map to symptom metadata (question_text, group)
+Thuật toán scoring:
+  1. Tìm rules gần thỏa (near-fire: missing ≤ 3 facts)
+  2. Lấy missing facts từ các rules đó
+  3. Map missing facts → candidate questions
+  4. Score mỗi candidate question:
+     - coverage_score: số missing facts được hỏi
+     - discrimination_score: số diagnoses phân biệt
+     - group_bonus: cùng group → +bonus
+     - asked_penalty: đã hỏi rồi → loại
+  5. Return câu hỏi có score cao nhất
+  6. Fallback: câu hỏi tiếp theo theo flow JSON gốc
 """
 
-import logging
-from engine.backward_module import suggest_backward_questions
-from utils.mapper import build_symptom_map
-
-logger = logging.getLogger(__name__)
-
-# Cache symptom map
-_symptom_map = None
+from __future__ import annotations
+from typing import Optional
 
 
-def _get_symptom_map():
-    global _symptom_map
-    if _symptom_map is None:
-        _symptom_map = build_symptom_map()
-    return _symptom_map
-
-
-def select_next_question(state):
+class QuestionSelector:
     """
-    Select the most informative question to ask next.
+    Chọn câu hỏi tiếp theo một cách thông minh dựa trên trạng thái hiện tại.
 
-    Uses backward chaining to find which missing condition appears
-    in the most candidate rules (highest discrimination power).
+    Dynamic Questioning Strategy:
+    - Ưu tiên câu hỏi giúp fire rules gần nhất
+    - Ưu tiên câu hỏi phân biệt được nhiều diagnoses
+    - Không hỏi lại câu đã hỏi
+    - Không nhảy group bừa (group_bonus)
+    """
 
-    Args:
-        state: StateManager instance
+    # Thông số scoring
+    COVERAGE_WEIGHT = 2.0      # Hệ số cho số facts covered
+    DISCRIM_WEIGHT = 1.5       # Hệ số cho khả năng phân biệt diagnosis
+    GROUP_BONUS = 0.5          # Bonus cùng group
+    MAX_MISSING = 3            # Số missing facts tối đa để xét "near-fire"
 
-    Returns:
-        dict with question info, or None if nothing left to ask.
-        {
-            'question_code': str,
-            'question_text': str,
-            'group': str,
-            'reason': str  # why this question was selected
+    def __init__(self, questions_data: list[dict], diagnoses_data: list[dict]):
+        self._questions: dict[str, dict] = {q["id"]: q for q in questions_data}
+        self._diagnoses: list[dict] = diagnoses_data
+
+        # Pre-build: fact → list of question IDs có thể cung cấp fact này
+        self._fact_to_questions: dict[str, list[str]] = self._build_fact_question_map()
+
+        # Pre-build: question → set of facts nó có thể add
+        self._question_to_facts: dict[str, set[str]] = self._build_question_fact_map()
+
+        # Pre-build: diagnosis → set of facts liên quan
+        self._diag_to_facts: dict[str, set[str]] = self._build_diag_fact_map()
+
+    def _build_fact_question_map(self) -> dict[str, list[str]]:
+        """Mỗi fact liên kết đến các câu hỏi có thể cung cấp fact đó."""
+        result: dict[str, list[str]] = {}
+        for qid, q in self._questions.items():
+            for opt in q.get("options", []):
+                for fact in opt.get("adds_facts", []):
+                    result.setdefault(fact, [])
+                    if qid not in result[fact]:
+                        result[fact].append(qid)
+        return result
+
+    def _build_question_fact_map(self) -> dict[str, set[str]]:
+        """Mỗi câu hỏi có thể cung cấp những facts nào."""
+        result: dict[str, set[str]] = {}
+        for qid, q in self._questions.items():
+            facts = set()
+            for opt in q.get("options", []):
+                facts.update(opt.get("adds_facts", []))
+            result[qid] = facts
+        return result
+
+    def _build_diag_fact_map(self) -> dict[str, set[str]]:
+        """Mỗi diagnosis liên quan đến những facts nào."""
+        result: dict[str, set[str]] = {}
+        for d in self._diagnoses:
+            result[d["id"]] = set(d.get("symptoms", []))
+        return result
+
+    def select(
+        self,
+        near_fire_rules: list[dict],
+        asked_qids: set[str],
+        current_group: Optional[str],
+        fallback_qid: Optional[str] = None,
+        wm_facts: Optional[set[str]] = None,
+    ) -> Optional[str]:
+        """
+        Chọn câu hỏi tốt nhất tiếp theo.
+
+        Args:
+            near_fire_rules: Output từ engine.get_near_fire_rules()
+            asked_qids: Set các QID đã hỏi
+            current_group: Nhóm lỗi đang chẩn đoán
+            fallback_qid: Câu hỏi mặc định từ JSON flow
+            wm_facts: Facts hiện có trong WM
+
+        Returns:
+            QID của câu hỏi được chọn, hoặc None
+        """
+        if not near_fire_rules:
+            return fallback_qid
+
+        # Step 1: Gom tất cả missing facts từ near-fire rules
+        candidate_facts: set[str] = set()
+        for nf in near_fire_rules:
+            candidate_facts.update(nf["missing_facts"])
+
+        # Step 2: Tìm candidate questions (có thể cung cấp ít nhất 1 missing fact)
+        candidate_qids: set[str] = set()
+        for fact in candidate_facts:
+            for qid in self._fact_to_questions.get(fact, []):
+                if qid not in asked_qids:
+                    candidate_qids.add(qid)
+
+        # Loại bỏ câu đã hỏi
+        candidate_qids -= asked_qids
+
+        if not candidate_qids:
+            return fallback_qid
+
+        # Step 3: Score từng candidate
+        scored = []
+        for qid in candidate_qids:
+            score = self._score_question(
+                qid, candidate_facts, near_fire_rules, current_group
+            )
+            scored.append((qid, score))
+
+        if not scored:
+            return fallback_qid
+
+        # Chọn câu có score cao nhất
+        scored.sort(key=lambda x: x[1], reverse=True)
+        best_qid = scored[0][0]
+
+        # Nếu fallback tốt hơn hoặc bằng best → ưu tiên fallback (JSON flow)
+        # Điều này đảm bảo dynamic questioning chỉ "bổ sung" chứ không phá vỡ flow
+        if fallback_qid and fallback_qid not in asked_qids:
+            fallback_score = self._score_question(
+                fallback_qid, candidate_facts, near_fire_rules, current_group
+            )
+            # Fallback ưu tiên trừ khi candidate score cao hơn đáng kể (>1.5x)
+            if fallback_score > 0 or scored[0][1] < 1.5:
+                return fallback_qid
+
+        return best_qid
+
+    def _score_question(
+        self,
+        qid: str,
+        candidate_facts: set[str],
+        near_fire_rules: list[dict],
+        current_group: Optional[str],
+    ) -> float:
+        """Tính score cho một câu hỏi."""
+        question = self._questions.get(qid)
+        if not question:
+            return 0.0
+
+        q_facts = self._question_to_facts.get(qid, set())
+
+        # 1. Coverage: số missing facts mà câu hỏi này có thể hỏi
+        covered = q_facts & candidate_facts
+        coverage_score = len(covered) * self.COVERAGE_WEIGHT
+
+        # 2. Discrimination: câu hỏi này giúp phân biệt bao nhiêu diagnoses
+        diag_count = 0
+        for diag_id, diag_facts in self._diag_to_facts.items():
+            if q_facts & diag_facts:
+                diag_count += 1
+        discrim_score = min(diag_count / max(len(self._diagnoses), 1), 1.0) * self.DISCRIM_WEIGHT
+
+        # 3. Group bonus: cùng group với chẩn đoán đang chạy
+        group_score = 0.0
+        if current_group and question.get("group") == current_group:
+            group_score = self.GROUP_BONUS
+
+        # 4. Proximity bonus: câu hỏi sắp fire rules gần nhất
+        proximity_score = 0.0
+        for nf in near_fire_rules[:3]:  # Top 3 rules gần nhất
+            missing = set(nf["missing_facts"])
+            overlap = len(q_facts & missing)
+            if overlap > 0:
+                # Rule có ít missing facts hơn → ưu tiên hơn
+                proximity_score += overlap / nf["missing_count"]
+
+        total = coverage_score + discrim_score + group_score + proximity_score
+        return round(total, 3)
+
+    def build_question_context(
+        self,
+        qid: str,
+        near_fire_rules: list[dict],
+        current_group: Optional[str],
+    ) -> str:
+        """
+        Tạo context explanation ngắn để bot giải thích tại sao hỏi câu này.
+        Dùng cho "short_explanation" trong bot message.
+        """
+        q = self._questions.get(qid)
+        if not q:
+            return ""
+
+        purpose = q.get("purpose", "")
+        if purpose:
+            return purpose
+
+        # Fallback: tạo từ near-fire rules
+        if near_fire_rules:
+            rule_names = [nf["rule"].name for nf in near_fire_rules[:2]]
+            if rule_names:
+                return f"Câu hỏi này giúp kiểm tra: {', '.join(rule_names)}"
+
+        return ""
+
+    def get_group_first_question(self, group_id: str) -> Optional[str]:
+        """Tìm câu hỏi đầu tiên của một nhóm (dùng khi user chọn group từ NLU)."""
+        group_to_root = {
+            "power_startup": "Q02",
+            "display": "Q09",
+            "os_boot": "Q13",
+            "network": "Q20",
+            "audio_camera": "Q27",
+            "peripherals": "Q32",
+            "performance": "Q37",
+            "storage": "Q36",
         }
-    """
-    # Get suggestions from backward chaining
-    suggestions = suggest_backward_questions(
-        state.candidate_rules,
-        state.facts,
-        asked_codes=state.asked,
-        max_count=10
-    )
-
-    if not suggestions:
-        logger.info("Question selector: no more questions to ask")
-        return None
-
-    symptom_map = _get_symptom_map()
-
-    # Find first suggestion with valid symptom metadata
-    for code in suggestions:
-        symptom = symptom_map.get(code)
-        if symptom:
-            # Count how many rules need this fact
-            rule_count = sum(
-                1 for r in state.candidate_rules
-                for c in r.get('conditions', [])
-                if c['code'] == code and code not in state.facts
-            )
-
-            question = {
-                'question_code': code,
-                'question_text': symptom['question_text'],
-                'group': symptom.get('group', 'unknown'),
-                'reason': f'Liên quan đến {rule_count} luật ứng viên'
-            }
-
-            logger.info(
-                "Selected question: %s (covers %d rules)",
-                code, rule_count
-            )
-            return question
-
-    logger.info("Question selector: no valid symptom found for suggestions")
-    return None
-
-
-def get_question_stats(state):
-    """
-    Get statistics about the current question selection state.
-
-    Returns:
-        dict with stats for debug/explanation
-    """
-    from engine.backward_module import get_missing_frequency
-
-    freq = get_missing_frequency(state.candidate_rules, state.facts)
-    total_missing = len(freq)
-    top_5 = freq.most_common(5)
-
-    return {
-        'total_missing_conditions': total_missing,
-        'candidate_rules_count': len(state.candidate_rules),
-        'facts_collected': len(state.facts),
-        'questions_asked': len(state.asked),
-        'top_conditions': [
-            {'code': code, 'frequency': count}
-            for code, count in top_5
-        ]
-    }
+        return group_to_root.get(group_id)

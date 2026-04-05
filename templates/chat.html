@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PC Expert — Hệ Chuyên Gia Chẩn Đoán Máy Tính</title>
+  <meta name="description" content="Hệ chuyên gia chẩn đoán lỗi máy tính dựa trên luật IF-THEN với forward chaining. Chẩn đoán nhanh, giải thích rõ ràng." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════ -->
+<header class="app-header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="brand-icon">🖥️</div>
+      <div>
+        <h1 class="brand-title">PC Expert</h1>
+        <p class="brand-subtitle">Hệ Chuyên Gia Chẩn Đoán Máy Tính</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="kb-stats" id="kb-stats">
+        <span class="stat-badge" title="Knowledge Base">
+          <span class="stat-icon">📚</span>
+          <span id="stat-rules">103 luật</span>
+        </span>
+      </div>
+      <button class="btn-restart" id="btn-restart-header" onclick="restartSession()" title="Bắt đầu lại">
+        🔄 Bắt đầu lại
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════
+     MAIN LAYOUT
+════════════════════════════════════════════ -->
+<main class="app-main">
+
+  <!-- Chat container -->
+  <section class="chat-container" id="chat-container" aria-live="polite" aria-label="Cửa sổ hội thoại chẩn đoán">
+    <div class="chat-messages" id="chat-messages">
+      <!-- Messages injected by JS -->
+    </div>
+
+    <!-- Input area -->
+    <div class="chat-input-area" id="chat-input-area">
+      <!-- Quick reply buttons -->
+      <div class="quick-replies" id="quick-replies"></div>
+
+      <!-- Multi-select area -->
+      <div class="multi-select-area" id="multi-select-area" style="display:none">
+        <div class="multi-select-list" id="multi-select-list"></div>
+        <button class="btn-submit-multi" id="btn-submit-multi" onclick="submitMultiChoice()">
+          ✅ Xác nhận &amp; Phân tích
+        </button>
+      </div>
+
+      <!-- Text input -->
+      <div class="text-input-row" id="text-input-row">
+        <input
+          type="text"
+          id="user-text-input"
+          class="user-input"
+          placeholder="Mô tả vấn đề bạn đang gặp phải... (Enter để gửi)"
+          autocomplete="off"
+          aria-label="Nhập mô tả vấn đề"
+        />
+        <button class="btn-send" id="btn-send" onclick="sendMessage()">
+          <span>Gửi</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Side panel: Reasoning -->
+  <aside class="side-panel" id="side-panel">
+    <div class="panel-header">
+      <h2 class="panel-title">🔍 Quá trình suy luận</h2>
+      <button class="panel-toggle" id="panel-toggle" onclick="togglePanel()" aria-label="Thu gọn/mở rộng panel">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Working Memory -->
+    <div class="panel-section">
+      <div class="section-label">📌 Facts đã thu thập (<span id="wm-count">0</span>)</div>
+      <div class="facts-list" id="facts-list">
+        <span class="empty-hint">Chưa có thông tin nào được ghi nhận.</span>
+      </div>
+    </div>
+
+    <!-- Candidate Diagnoses -->
+    <div class="panel-section">
+      <div class="section-label">🎯 Chẩn đoán tạm thời</div>
+      <div class="candidate-list" id="candidate-list">
+        <span class="empty-hint">Đang phân tích...</span>
+      </div>
+    </div>
+
+    <!-- Rules fired -->
+    <div class="panel-section" id="rules-section" style="display:none">
+      <div class="section-label">⚡ Luật đã kích hoạt</div>
+      <div class="rules-list" id="rules-list"></div>
+    </div>
+  </aside>
+
+</main>
+
+<!-- ══════════════════════════════════════════
+     DIAGNOSIS MODAL (kết quả cuối)
+════════════════════════════════════════════ -->
+<div class="modal-overlay" id="diagnosis-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="diagnosis-modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">🏥 Kết quả chẩn đoán</h2>
+      <button class="modal-close" onclick="closeDiagnosisModal()" aria-label="Đóng">✕</button>
+    </div>
+
+    <div class="modal-body" id="modal-body">
+      <!-- Primary diagnosis card -->
+      <div class="primary-diagnosis" id="primary-diagnosis"></div>
+
+      <!-- Top 3 alternatives -->
+      <div class="alt-diagnoses" id="alt-diagnoses"></div>
+
+      <!-- Actions -->
+      <div class="modal-actions">
+        <button class="btn-explain" onclick="showExplanation()">
+          📋 Xem giải thích chi tiết
+        </button>
+        <button class="btn-restart-modal" onclick="restartSession()">
+          🔄 Bắt đầu lại
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     EXPLANATION MODAL
+════════════════════════════════════════════ -->
+<div class="modal-overlay" id="explanation-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="exp-modal-title">
+  <div class="explanation-modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="exp-modal-title">📋 Giải thích quá trình suy luận</h2>
+      <button class="modal-close" onclick="closeExplanationModal()" aria-label="Đóng">✕</button>
+    </div>
+    <div class="modal-body exp-body" id="explanation-body">
+      <div class="loading-spinner">⏳ Đang tải...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TYPING INDICATOR (hidden by default)
+════════════════════════════════════════════ -->
+<template id="typing-template">
+  <div class="message bot-message typing-indicator" id="typing-indicator">
+    <div class="avatar">🤖</div>
+    <div class="bubble">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+  </div>
+</template>
+
+<script src="/static/js/chat.js"></script>
+</body>
+</html>

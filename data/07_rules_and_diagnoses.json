@@ -1,0 +1,1089 @@
+{
+  "rules": [
+    {
+      "id": "R001", "group": "power_startup", "priority": 3, "cf": 0.85,
+      "name": "Adapter hỏng — đèn pin đỏ + không sạc",
+      "conditions": ["no_power", "battery_indicator_red", "is_laptop"],
+      "adds_facts": ["probable_adapter_issue"]
+    },
+    {
+      "id": "R002", "group": "power_startup", "priority": 4, "cf": 0.90,
+      "name": "Xác nhận Adapter hỏng",
+      "conditions": ["probable_adapter_issue", "no_charge"],
+      "triggers_diagnosis": "DIAG_PWR_01"
+    },
+    {
+      "id": "R003", "group": "power_startup", "priority": 3, "cf": 0.85,
+      "name": "Pin chai — chỉ chạy khi cắm điện",
+      "conditions": ["power_led_on", "laptop_only_on_adapter", "is_laptop"],
+      "not_conditions": ["no_charge"],
+      "triggers_diagnosis": "DIAG_PWR_02"
+    },
+    {
+      "id": "R004", "group": "power_startup", "priority": 3, "cf": 0.80,
+      "name": "PSU Desktop hỏng — không điện",
+      "conditions": ["no_power", "is_desktop"],
+      "not_conditions": ["power_led_on"],
+      "adds_facts": ["probable_power_hardware"]
+    },
+    {
+      "id": "R005", "group": "power_startup", "priority": 3, "cf": 0.85,
+      "name": "Xác nhận PSU hỏng",
+      "conditions": ["probable_power_hardware"],
+      "not_conditions": ["power_led_on"],
+      "triggers_diagnosis": "DIAG_PWR_03"
+    },
+    {
+      "id": "R006", "group": "power_startup", "priority": 2, "cf": 0.75,
+      "name": "Bo mạch chủ lỗi điện (PSU test OK nhưng có điện, quạt không quay)",
+      "conditions": ["probable_power_hardware", "power_led_on", "fan_not_spinning"],
+      "_note": "fan_not_spinning được set bởi Q02-A — bật máy hoàn toàn không có phản ứng",
+      "triggers_diagnosis": "DIAG_PWR_04"
+    },
+    {
+      "id": "R007", "group": "power_startup", "priority": 4, "cf": 0.90,
+      "name": "POST thất bại — nhiều beep",
+      "conditions": ["multiple_beeps", "power_led_on", "fan_spinning"],
+      "adds_facts": ["bios_post_fail"]
+    },
+    {
+      "id": "R008", "group": "power_startup", "priority": 3, "cf": 0.80,
+      "name": "POST fail — RAM lỏng/hỏng",
+      "conditions": ["bios_post_fail", "no_display_after_power"],
+      "triggers_diagnosis": "DIAG_PWR_05"
+    },
+    {
+      "id": "R009", "group": "power_startup", "priority": 3, "cf": 0.85,
+      "name": "Boot OK nhưng không màn hình",
+      "conditions": ["power_led_on", "single_beep", "screen_black"],
+      "adds_facts": ["system_boots_no_display"]
+    },
+    {
+      "id": "R010", "group": "power_startup", "priority": 2, "cf": 0.70,
+      "name": "Không sạc — có thể lỗi cổng sạc",
+      "conditions": ["no_charge", "battery_indicator_red"],
+      "not_conditions": ["laptop_only_on_adapter"],
+      "triggers_diagnosis": "DIAG_PWR_01"
+    },
+    {
+      "id": "R_Q08_PSU", "group": "power_startup", "priority": 4, "cf": 0.87,
+      "name": "Ổ điện OK + Đèn MOBO tắt + PSU chưa xác nhận tốt → PSU hỏng",
+      "conditions": ["power_outlet_ok", "no_mobo_led", "no_power"],
+      "not_conditions": ["psu_tested_ok"],
+      "triggers_diagnosis": "DIAG_PWR_03"
+    },
+    {
+      "id": "R_Q08_MOBO", "group": "power_startup", "priority": 5, "cf": 0.90,
+      "name": "Ổ điện OK + PSU đã test tốt + MOBO không LED → Mobo lỗi",
+      "conditions": ["power_outlet_ok", "no_mobo_led", "psu_tested_ok", "no_power"],
+      "triggers_diagnosis": "DIAG_PWR_04"
+    },
+    {
+      "id": "R016", "group": "display", "priority": 4, "cf": 0.90,
+      "name": "Đen + màn ngoài OK — lỗi màn nội bộ",
+      "conditions": ["system_boots_no_display", "external_monitor_ok"],
+      "adds_facts": ["display_hardware_issue"]
+    },
+    {
+      "id": "R017", "group": "display", "priority": 2, "cf": 0.75,
+      "name": "Lỗi màn nội bộ — cáp màn hình lỏng",
+      "conditions": ["display_hardware_issue"],
+      "not_conditions": ["screen_lines", "screen_color_distorted"],
+      "triggers_diagnosis": "DIAG_DSP_01"
+    },
+    {
+      "id": "R018", "group": "display", "priority": 3, "cf": 0.85,
+      "name": "Lỗi màn nội bộ + sọc — panel LCD hỏng",
+      "conditions": ["display_hardware_issue", "screen_lines"],
+      "triggers_diagnosis": "DIAG_DSP_03"
+    },
+    {
+      "id": "R019", "group": "display", "priority": 3, "cf": 0.85,
+      "name": "Màn ngoài cũng lỗi — GPU/Driver",
+      "conditions": ["screen_black", "external_monitor_same_issue"],
+      "adds_facts": ["probable_gpu_issue"]
+    },
+    {
+      "id": "R020", "group": "display", "priority": 4, "cf": 0.90,
+      "name": "GPU issue + driver mới — lỗi driver GPU",
+      "conditions": ["probable_gpu_issue", "display_after_driver_install"],
+      "triggers_diagnosis": "DIAG_DSP_02"
+    },
+    {
+      "id": "R021", "group": "display", "priority": 3, "cf": 0.80,
+      "name": "GPU issue + màu sai + không driver mới — GPU hardware",
+      "conditions": ["probable_gpu_issue", "screen_color_distorted"],
+      "not_conditions": ["display_after_driver_install"],
+      "triggers_diagnosis": "DIAG_DSP_04"
+    },
+    {
+      "id": "R022", "group": "display", "priority": 3, "cf": 0.85,
+      "name": "Nhấp nháy + sau driver update",
+      "conditions": ["screen_flickering", "display_after_driver_install"],
+      "triggers_diagnosis": "DIAG_DSP_02"
+    },
+    {
+      "id": "R023", "group": "display", "priority": 3, "cf": 0.80,
+      "name": "Màn trắng — panel lỗi",
+      "conditions": ["screen_white"],
+      "not_conditions": ["external_monitor_same_issue"],
+      "triggers_diagnosis": "DIAG_DSP_03"
+    },
+    {
+      "id": "R024", "group": "display", "priority": 3, "cf": 0.85,
+      "name": "Độ sáng thấp — cài đặt brightness",
+      "conditions": ["brightness_too_low"],
+      "not_conditions": ["screen_lines", "screen_flickering"],
+      "triggers_diagnosis": "DIAG_DSP_05"
+    },
+    {
+      "id": "R025", "group": "display", "priority": 3, "cf": 0.80,
+      "name": "Nhìn nghiêng thấy hình — backlight hỏng",
+      "conditions": ["brightness_too_low", "backlight_fail"],
+      "triggers_diagnosis": "DIAG_DSP_03"
+    },
+    {
+      "id": "R026", "group": "display", "priority": 5, "cf": 0.95,
+      "name": "Va đập + sọc — vỡ panel",
+      "conditions": ["screen_lines", "physical_impact_suspected"],
+      "triggers_diagnosis": "DIAG_DSP_03"
+    },
+    {
+      "id": "R029", "group": "os_boot", "priority": 3, "cf": 0.85,
+      "name": "BSOD + memory error — lỗi RAM",
+      "conditions": ["bsod_appears", "bsod_memory_error"],
+      "adds_facts": ["ram_related_bsod"]
+    },
+    {
+      "id": "R030", "group": "os_boot", "priority": 3, "cf": 0.85,
+      "name": "RAM lỗi không từ driver — faulty RAM",
+      "conditions": ["ram_related_bsod"],
+      "not_conditions": ["recent_driver_update"],
+      "triggers_diagnosis": "DIAG_OS_03"
+    },
+    {
+      "id": "R031", "group": "os_boot", "priority": 2, "cf": 0.75,
+      "name": "RAM lỗi + driver update — có thể driver gây BSOD memory",
+      "conditions": ["ram_related_bsod", "recent_driver_update"],
+      "adds_facts": ["driver_related_bsod"]
+    },
+    {
+      "id": "R032", "group": "os_boot", "priority": 4, "cf": 0.90,
+      "name": "BSOD + driver error code",
+      "conditions": ["bsod_appears", "bsod_driver_error"],
+      "adds_facts": ["driver_related_bsod"]
+    },
+    {
+      "id": "R033", "group": "os_boot", "priority": 4, "cf": 0.90,
+      "name": "Driver BSOD + thay đổi gần đây",
+      "conditions": ["driver_related_bsod", "recent_change_caused_issue"],
+      "triggers_diagnosis": "DIAG_OS_02"
+    },
+    {
+      "id": "R034", "group": "os_boot", "priority": 2, "cf": 0.75,
+      "name": "Driver BSOD + không thay đổi — file hệ thống",
+      "conditions": ["driver_related_bsod"],
+      "not_conditions": ["recent_change_caused_issue"],
+      "triggers_diagnosis": "DIAG_OS_01"
+    },
+    {
+      "id": "R035", "group": "os_boot", "priority": 4, "cf": 0.90,
+      "name": "BSOD + disk error code",
+      "conditions": ["bsod_appears", "bsod_disk_error"],
+      "adds_facts": ["disk_related_bsod"]
+    },
+    {
+      "id": "R036", "group": "os_boot", "priority": 3, "cf": 0.85,
+      "name": "Disk BSOD — HDD/SSD lỗi",
+      "conditions": ["disk_related_bsod"],
+      "triggers_diagnosis": "DIAG_OS_04"
+    },
+    {
+      "id": "R037", "group": "os_boot", "priority": 4, "cf": 0.90,
+      "name": "Boot loop + Windows Update — update gây lỗi",
+      "conditions": ["boot_loop", "recent_windows_update"],
+      "triggers_diagnosis": "DIAG_OS_05"
+    },
+    {
+      "id": "R038", "group": "os_boot", "priority": 3, "cf": 0.80,
+      "name": "Boot loop không update — MBR hỏng",
+      "conditions": ["boot_loop"],
+      "not_conditions": ["recent_windows_update", "recent_software_install"],
+      "triggers_diagnosis": "DIAG_OS_06"
+    },
+    {
+      "id": "R039", "group": "os_boot", "priority": 3, "cf": 0.80,
+      "name": "Dừng logo + Safe Mode OK — driver startup lỗi",
+      "conditions": ["stuck_at_logo", "safe_mode_works"],
+      "triggers_diagnosis": "DIAG_OS_02"
+    },
+    {
+      "id": "R040", "group": "os_boot", "priority": 3, "cf": 0.85,
+      "name": "Dừng logo + Safe Mode fail — OS hỏng nghiêm trọng",
+      "conditions": ["stuck_at_logo", "safe_mode_fails"],
+      "triggers_diagnosis": "DIAG_OS_01"
+    },
+    {
+      "id": "R041", "group": "os_boot", "priority": 3, "cf": 0.85,
+      "name": "Windows không load + Safe Mode fail — MBR",
+      "conditions": ["windows_not_loading", "safe_mode_fails"],
+      "not_conditions": ["recent_change_caused_issue"],
+      "triggers_diagnosis": "DIAG_OS_06"
+    },
+    {
+      "id": "R042", "group": "os_boot", "priority": 2, "cf": 0.75,
+      "name": "Treo random + thay đổi gần đây — software conflict",
+      "conditions": ["os_freezes_randomly", "recent_change_caused_issue"],
+      "triggers_diagnosis": "DIAG_OS_02"
+    },
+    {
+      "id": "R044", "group": "os_boot", "priority": 3, "cf": 0.85,
+      "name": "SFC lỗi + treo — file hệ thống hỏng",
+      "conditions": ["sfc_errors_found", "os_freezes_randomly"],
+      "triggers_diagnosis": "DIAG_OS_01"
+    },
+    {
+      "id": "R049", "group": "network", "priority": 4, "cf": 0.90,
+      "name": "Không thấy Wi-Fi + không có adapter — adapter hardware hỏng",
+      "conditions": ["wifi_not_visible", "wifi_adapter_missing"],
+      "triggers_diagnosis": "DIAG_NET_02"
+    },
+    {
+      "id": "R050", "group": "network", "priority": 3, "cf": 0.85,
+      "name": "Không thấy Wi-Fi + có adapter — lỗi driver",
+      "conditions": ["wifi_not_visible"],
+      "not_conditions": ["wifi_adapter_missing"],
+      "adds_facts": ["probable_wifi_driver_issue"]
+    },
+    {
+      "id": "R051", "group": "network", "priority": 3, "cf": 0.85,
+      "name": "Driver Wi-Fi lỗi — chẩn đoán",
+      "conditions": ["probable_wifi_driver_issue"],
+      "triggers_diagnosis": "DIAG_NET_01"
+    },
+    {
+      "id": "R052", "group": "network", "priority": 3, "cf": 0.85,
+      "name": "Có Wi-Fi không Internet + thiết bị khác OK — lỗi ở máy này",
+      "conditions": ["wifi_connected_no_internet", "other_devices_same_wifi_ok"],
+      "adds_facts": ["probable_local_network_config_issue"]
+    },
+    {
+      "id": "R053", "group": "network", "priority": 4, "cf": 0.90,
+      "name": "Cấu hình mạng lỗi + DNS error — lỗi DNS",
+      "conditions": ["probable_local_network_config_issue", "dns_error_message"],
+      "triggers_diagnosis": "DIAG_NET_03"
+    },
+    {
+      "id": "R054", "group": "network", "priority": 4, "cf": 0.90,
+      "name": "Cấu hình mạng lỗi + IP conflict",
+      "conditions": ["probable_local_network_config_issue", "ip_conflict"],
+      "triggers_diagnosis": "DIAG_NET_06"
+    },
+    {
+      "id": "R055", "group": "network", "priority": 3, "cf": 0.85,
+      "name": "Cấu hình mạng + cáp LAN cũng lỗi — network stack hỏng",
+      "conditions": ["probable_local_network_config_issue", "ethernet_no_internet"],
+      "triggers_diagnosis": "DIAG_NET_05"
+    },
+    {
+      "id": "R056", "group": "network", "priority": 4, "cf": 0.90,
+      "name": "Wi-Fi + LAN đều lỗi + tất cả thiết bị — router/ISP",
+      "conditions": ["wifi_connected_no_internet", "ethernet_no_internet", "other_devices_same_wifi_fail"],
+      "triggers_diagnosis": "DIAG_NET_04"
+    },
+    {
+      "id": "R058", "group": "network", "priority": 2, "cf": 0.75,
+      "name": "Chỉ một số website — DNS hoặc VPN",
+      "conditions": ["specific_sites_blocked"],
+      "not_conditions": ["vpn_related"],
+      "triggers_diagnosis": "DIAG_NET_03"
+    },
+    {
+      "id": "R060", "group": "network", "priority": 2, "cf": 0.70,
+      "name": "Wi-Fi chậm + thiết bị khác OK — driver/adapter",
+      "conditions": ["wifi_slow", "other_devices_same_wifi_ok"],
+      "triggers_diagnosis": "DIAG_NET_01"
+    },
+    {
+      "id": "R066", "group": "audio_camera", "priority": 3, "cf": 0.85,
+      "name": "Không âm thanh + không thấy device — hardware soundcard lỗi",
+      "conditions": ["no_sound", "audio_device_missing"],
+      "triggers_diagnosis": "DIAG_AUD_03"
+    },
+    {
+      "id": "R067", "group": "audio_camera", "priority": 4, "cf": 0.90,
+      "name": "Không âm thanh + driver lỗi",
+      "conditions": ["no_sound", "audio_driver_yellow_mark"],
+      "triggers_diagnosis": "DIAG_AUD_01"
+    },
+    {
+      "id": "R068", "group": "audio_camera", "priority": 3, "cf": 0.85,
+      "name": "Không âm thanh + device bình thường — muted/disabled",
+      "conditions": ["no_sound"],
+      "not_conditions": ["audio_device_missing", "audio_driver_yellow_mark"],
+      "triggers_diagnosis": "DIAG_AUD_02"
+    },
+    {
+      "id": "R069", "group": "audio_camera", "priority": 3, "cf": 0.80,
+      "name": "Âm thanh sau restart rồi mất — driver không ổn định",
+      "conditions": ["audio_works_after_restart", "no_sound"],
+      "triggers_diagnosis": "DIAG_AUD_01"
+    },
+    {
+      "id": "R072", "group": "audio_camera", "priority": 5, "cf": 0.95,
+      "name": "Camera bị chặn Privacy",
+      "conditions": ["camera_not_detected", "camera_privacy_blocked"],
+      "triggers_diagnosis": "DIAG_CAM_01"
+    },
+    {
+      "id": "R073", "group": "audio_camera", "priority": 3, "cf": 0.85,
+      "name": "Camera lỗi + không phải privacy — driver",
+      "conditions": ["camera_not_detected"],
+      "not_conditions": ["camera_privacy_blocked"],
+      "triggers_diagnosis": "DIAG_CAM_02"
+    },
+    {
+      "id": "R075", "group": "audio_camera", "priority": 4, "cf": 0.90,
+      "name": "Micro disabled trong settings",
+      "conditions": ["microphone_not_working", "micro_disabled_in_settings"],
+      "triggers_diagnosis": "DIAG_AUD_02"
+    },
+    {
+      "id": "R076", "group": "audio_camera", "priority": 3, "cf": 0.85,
+      "name": "Micro lỗi + driver vấn đề",
+      "conditions": ["microphone_not_working", "audio_driver_yellow_mark"],
+      "triggers_diagnosis": "DIAG_AUD_01"
+    },
+    {
+      "id": "R079", "group": "peripherals", "priority": 4, "cf": 0.90,
+      "name": "USB không nhận + 1 cổng + thiết bị OK máy khác — cổng USB hỏng",
+      "conditions": ["usb_not_detected", "specific_usb_port_fail", "usb_device_works_on_other_pc"],
+      "triggers_diagnosis": "DIAG_PER_01"
+    },
+    {
+      "id": "R080", "group": "peripherals", "priority": 3, "cf": 0.85,
+      "name": "USB không nhận + tất cả cổng — USB Controller lỗi",
+      "conditions": ["usb_not_detected", "all_usb_ports_fail"],
+      "triggers_diagnosis": "DIAG_PER_02"
+    },
+    {
+      "id": "R081", "group": "peripherals", "priority": 4, "cf": 0.90,
+      "name": "USB thiết bị lỗi ở mọi nơi — thiết bị hỏng",
+      "conditions": ["usb_not_detected", "usb_device_fails_all_ports"],
+      "triggers_diagnosis": "DIAG_PER_03"
+    },
+    {
+      "id": "R082", "group": "peripherals", "priority": 3, "cf": 0.85,
+      "name": "USB nhận nhưng lỗi + thiết bị OK máy khác — driver",
+      "conditions": ["usb_device_error", "usb_device_works_on_other_pc"],
+      "triggers_diagnosis": "DIAG_PER_04"
+    },
+    {
+      "id": "R091", "group": "performance", "priority": 4, "cf": 0.90,
+      "name": "Quạt ồn + nóng + CPU cao — thermal throttling",
+      "conditions": ["fan_very_loud", "laptop_very_hot", "high_cpu_usage"],
+      "adds_facts": ["thermal_throttling"]
+    },
+    {
+      "id": "R092", "group": "performance", "priority": 4, "cf": 0.90,
+      "name": "Thermal throttling — chẩn đoán quá nhiệt",
+      "conditions": ["thermal_throttling"],
+      "triggers_diagnosis": "DIAG_PERF_01"
+    },
+    {
+      "id": "R093", "group": "performance", "priority": 5, "cf": 0.95,
+      "name": "Thermal + máy cũ + bụi — bụi + keo nhiệt",
+      "conditions": ["thermal_throttling", "thermal_paste_old", "dust_in_vents"],
+      "triggers_diagnosis": "DIAG_PERF_01"
+    },
+    {
+      "id": "R094", "group": "performance", "priority": 3, "cf": 0.85,
+      "name": "CPU cao + malware — malware gây chậm",
+      "conditions": ["high_cpu_usage", "malware_suspected"],
+      "adds_facts": ["malware_causing_slow"]
+    },
+    {
+      "id": "R095", "group": "performance", "priority": 3, "cf": 0.85,
+      "name": "Malware xác nhận",
+      "conditions": ["malware_causing_slow"],
+      "triggers_diagnosis": "DIAG_PERF_02"
+    },
+    {
+      "id": "R096", "group": "performance", "priority": 4, "cf": 0.90,
+      "name": "Boot chậm + nhiều startup",
+      "conditions": ["slow_boot_time", "startup_programs_many"],
+      "triggers_diagnosis": "DIAG_PERF_03"
+    },
+    {
+      "id": "R097", "group": "performance", "priority": 3, "cf": 0.85,
+      "name": "RAM đầy + chậm — RAM không đủ",
+      "conditions": ["high_memory_usage", "system_very_slow"],
+      "not_conditions": ["thermal_throttling"],
+      "triggers_diagnosis": "DIAG_PERF_04"
+    },
+    {
+      "id": "R098", "group": "performance", "priority": 3, "cf": 0.85,
+      "name": "Disk 100% + chậm — ổ đĩa bottleneck",
+      "conditions": ["high_disk_usage", "system_very_slow"],
+      "adds_facts": ["storage_causing_slow"]
+    },
+    {
+      "id": "R099", "group": "performance", "priority": 4, "cf": 0.90,
+      "name": "Disk bottleneck + disk đầy",
+      "conditions": ["storage_causing_slow", "disk_full"],
+      "triggers_diagnosis": "DIAG_STR_01"
+    },
+    {
+      "id": "R100", "group": "performance", "priority": 4, "cf": 0.90,
+      "name": "Disk bottleneck + click sound — HDD hỏng",
+      "conditions": ["storage_causing_slow", "disk_error_sound"],
+      "triggers_diagnosis": "DIAG_STR_02"
+    },
+    {
+      "id": "R106", "group": "storage", "priority": 4, "cf": 0.90,
+      "name": "Ổ đĩa đầy + hệ thống chậm",
+      "conditions": ["disk_full", "system_very_slow"],
+      "triggers_diagnosis": "DIAG_STR_01"
+    },
+    {
+      "id": "R107", "group": "storage", "priority": 4, "cf": 0.90,
+      "name": "Click sound + chậm copy — HDD sắp hỏng",
+      "conditions": ["disk_error_sound", "slow_file_transfer"],
+      "adds_facts": ["hdd_failing"]
+    },
+    {
+      "id": "R108", "group": "storage", "priority": 4, "cf": 0.90,
+      "name": "HDD failing — chẩn đoán",
+      "conditions": ["hdd_failing"],
+      "triggers_diagnosis": "DIAG_STR_02"
+    },
+    {
+      "id": "R109", "group": "storage", "priority": 4, "cf": 0.90,
+      "name": "File lỗi + CHKDSK lỗi — file system hỏng",
+      "conditions": ["file_corruption", "chkdsk_errors"],
+      "triggers_diagnosis": "DIAG_STR_04"
+    },
+    {
+      "id": "R110", "group": "storage", "priority": 3, "cf": 0.85,
+      "name": "Bad sectors + file lỗi — HDD hỏng",
+      "conditions": ["bad_sectors_detected", "file_corruption"],
+      "triggers_diagnosis": "DIAG_STR_02"
+    },
+    {
+      "id": "R111", "group": "storage", "priority": 3, "cf": 0.85,
+      "name": "SSD health thấp + chậm",
+      "conditions": ["ssd_health_low", "slow_file_transfer"],
+      "triggers_diagnosis": "DIAG_STR_03"
+    },
+    {
+      "id": "R113", "group": "storage", "priority": 5, "cf": 0.95,
+      "name": "BSOD disk + click sound — ổ đĩa làm BSOD",
+      "conditions": ["bsod_disk_error", "disk_error_sound"],
+      "triggers_diagnosis": "DIAG_OS_04"
+    },
+    {
+      "id": "R114", "group": "storage", "priority": 3, "cf": 0.80,
+      "name": "File lỗi + Windows không load — MBR",
+      "conditions": ["file_corruption", "windows_not_loading"],
+      "not_conditions": ["recent_change_caused_issue"],
+      "triggers_diagnosis": "DIAG_OS_06"
+    },
+
+    { "id": "R_BT01", "group": "peripherals", "priority": 5, "cf": 0.95,
+      "name": "Bluetooth toggle tắt — switch bị tắt",
+      "conditions": ["bluetooth_not_working", "bt_toggle_off"],
+      "triggers_diagnosis": "DIAG_BT_01" },
+
+    { "id": "R_BT02", "group": "peripherals", "priority": 4, "cf": 0.90,
+      "name": "BT adapter không tìm thấy — hardware hỏng",
+      "conditions": ["bluetooth_not_working", "bt_adapter_missing"],
+      "triggers_diagnosis": "DIAG_BT_02" },
+
+    { "id": "R_BT03", "group": "peripherals", "priority": 3, "cf": 0.85,
+      "name": "BT pair fail — xung đột pairing hoặc driver",
+      "conditions": ["bluetooth_not_working", "bt_on_pair_fail"],
+      "not_conditions": ["bt_adapter_missing"],
+      "triggers_diagnosis": "DIAG_BT_03" },
+
+    { "id": "R_BT04", "group": "peripherals", "priority": 3, "cf": 0.80,
+      "name": "BT không ổn định sau Update — driver",
+      "conditions": ["bluetooth_not_working", "bt_stopped_after_update"],
+      "triggers_diagnosis": "DIAG_BT_02" },
+
+    { "id": "R_TOUCH01", "group": "peripherals", "priority": 5, "cf": 0.95,
+      "name": "Touchpad hotkey bị nhấn",
+      "conditions": ["touchpad_not_working", "touchpad_hotkey_disabled"],
+      "triggers_diagnosis": "DIAG_TOUCH_01" },
+
+    { "id": "R_TOUCH02", "group": "peripherals", "priority": 4, "cf": 0.90,
+      "name": "Touchpad tắt trong Settings",
+      "conditions": ["touchpad_not_working", "touchpad_disabled_settings"],
+      "triggers_diagnosis": "DIAG_TOUCH_01" },
+
+    { "id": "R_TOUCH03", "group": "peripherals", "priority": 4, "cf": 0.85,
+      "name": "Touchpad driver lỗi + từng hoạt động",
+      "conditions": ["touchpad_not_working", "touchpad_driver_error", "touchpad_was_working"],
+      "triggers_diagnosis": "DIAG_TOUCH_01" },
+
+    { "id": "R_TOUCH04", "group": "peripherals", "priority": 4, "cf": 0.90,
+      "name": "Touchpad không xuất hiện DM — hardware",
+      "conditions": ["touchpad_not_working", "touchpad_not_detected_hw"],
+      "triggers_diagnosis": "DIAG_TOUCH_02" },
+
+    { "id": "R_SHTDN01", "group": "power_startup", "priority": 5, "cf": 0.95,
+      "name": "Nhiệt trước khi tắt + chạy nặng — Thermal Shutdown",
+      "conditions": ["overheats_before_shutdown", "shuts_under_load"],
+      "triggers_diagnosis": "DIAG_SHTDN_01" },
+
+    { "id": "R_SHTDN02", "group": "power_startup", "priority": 4, "cf": 0.85,
+      "name": "Tắt khi thay đổi nguồn — lỗi pin/adapter",
+      "conditions": ["shuts_on_charge_change", "is_laptop"],
+      "triggers_diagnosis": "DIAG_SHTDN_02" },
+
+    { "id": "R_SHTDN03", "group": "power_startup", "priority": 4, "cf": 0.80,
+      "name": "Tắt ngẫu nhiên + nhiệt bình thường — PSU/RAM lỗi",
+      "conditions": ["shuts_randomly", "no_thermal_before_shutdown"],
+      "triggers_diagnosis": "DIAG_SHTDN_03" },
+
+    { "id": "R_SHTDN04", "group": "power_startup", "priority": 4, "cf": 0.85,
+      "name": "Tắt theo timer — Thermal Shutdown timer",
+      "conditions": ["shuts_on_timer"],
+      "triggers_diagnosis": "DIAG_SHTDN_01" },
+
+    { "id": "R_BIOS01", "group": "storage", "priority": 4, "cf": 0.85,
+      "name": "SATA disk không nhận trong BIOS",
+      "conditions": ["disk_not_in_bios", "sata_disk"],
+      "triggers_diagnosis": "DIAG_BIOS_01" },
+
+    { "id": "R_BIOS02", "group": "storage", "priority": 4, "cf": 0.88,
+      "name": "NVMe disk không nhận trong BIOS",
+      "conditions": ["disk_not_in_bios", "nvme_disk"],
+      "triggers_diagnosis": "DIAG_BIOS_01" },
+
+    { "id": "R_BIOS03", "group": "storage", "priority": 4, "cf": 0.85,
+      "name": "Disk mới lắp không được nhận",
+      "conditions": ["new_disk_not_detected"],
+      "triggers_diagnosis": "DIAG_BIOS_01" },
+
+    { "id": "R_BIOS04", "group": "storage", "priority": 4, "cf": 0.80,
+      "name": "Disk từng hoạt động, đột nhiên không nhận — HDD hỏng",
+      "conditions": ["disk_not_in_bios", "disk_worked_before"],
+      "triggers_diagnosis": "DIAG_STR_02" },
+
+    { "id": "R_Q38_RAM", "group": "performance", "priority": 4, "cf": 0.88,
+      "name": "RAM đầy — cần nâng cấp hoặc đóng bớt app",
+      "conditions": ["high_memory_usage"],
+      "triggers_diagnosis": "DIAG_PERF_04" },
+
+    { "id": "R_Q38_DISK", "group": "performance", "priority": 4, "cf": 0.85,
+      "name": "Disk 100% — dấu hiệu HDD chậm hoặc service nền",
+      "conditions": ["high_disk_usage"],
+      "not_conditions": ["bad_sectors_detected"],
+      "triggers_diagnosis": "DIAG_STR_01" },
+
+    { "id": "R_Q38_CPU_HOT", "group": "performance", "priority": 5, "cf": 0.90,
+      "name": "CPU 100% + nhiệt độ cao — thermal throttle",
+      "conditions": ["high_cpu_usage", "laptop_very_hot"],
+      "triggers_diagnosis": "DIAG_PERF_01" },
+
+    { "id": "R_Q38_CPU_MALWARE", "group": "performance", "priority": 4, "cf": 0.85,
+      "name": "CPU 100% + nghi malware",
+      "conditions": ["high_cpu_usage", "malware_suspected"],
+      "triggers_diagnosis": "DIAG_PERF_02" },
+
+    { "id": "R_Q39_STARTUP", "group": "performance", "priority": 4, "cf": 0.85,
+      "name": "Chậm ngay từ bật — startup bloat",
+      "conditions": ["startup_programs_many", "slow_boot_time"],
+      "triggers_diagnosis": "DIAG_PERF_03" },
+
+    { "id": "R_Q39_MALWARE", "group": "performance", "priority": 4, "cf": 0.85,
+      "name": "Nghi malware xác nhận",
+      "conditions": ["malware_suspected"],
+      "not_conditions": ["high_cpu_usage"],
+      "triggers_diagnosis": "DIAG_PERF_02" },
+
+    { "id": "R_FRESH_WIN", "group": "os_boot", "priority": 4, "cf": 0.80,
+      "name": "Vừa cài lại Windows — driver/activation lỗi sau cài",
+      "conditions": ["fresh_windows_install"],
+      "triggers_diagnosis": "DIAG_OS_06" },
+
+    { "id": "R_NO_CHANGE_FREEZE", "group": "os_boot", "priority": 3, "cf": 0.75,
+      "name": "Không thay đổi + treo ngẫu nhiên — hardware lỗi",
+      "conditions": ["no_recent_change", "os_freezes_randomly"],
+      "triggers_diagnosis": "DIAG_OS_03" },
+
+    { "id": "R_PERF_DEGRADE", "group": "performance", "priority": 3, "cf": 0.75,
+      "name": "Hiệu năng giảm dần — cần vệ sinh + tối ưu đĩa",
+      "conditions": ["performance_degraded_over_time"],
+      "not_conditions": ["malware_suspected", "high_memory_usage"],
+      "triggers_diagnosis": "DIAG_PERF_01" }
+  ],
+
+  "diagnoses": [
+    {
+      "id": "DIAG_PWR_01", "code": "faulty_adapter",
+      "name": "Adapter nguồn hỏng", "group": "power_startup",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["no_power", "no_charge", "battery_indicator_red"],
+      "solution_steps": ["Kiểm tra đèn LED adapter", "Thử ổ điện khác", "Mua adapter chính hãng mới"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PWR_02", "code": "dead_battery",
+      "name": "Pin laptop chai hoặc hỏng", "group": "power_startup",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["laptop_only_on_adapter", "no_charge"],
+      "solution_steps": ["Chạy powercfg /batteryreport", "Thay pin nếu health < 80%"],
+      "needs_technician": false,
+      "warning": "Pin phồng → NGUY HIỂM, tháo ra ngay"
+    },
+    {
+      "id": "DIAG_PWR_03", "code": "faulty_psu",
+      "name": "Bộ nguồn máy bàn hỏng", "group": "power_startup",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["no_power", "is_desktop", "no_mobo_led"],
+      "solution_steps": ["Paperclip test PSU", "Thay PSU mới đúng wattage"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PWR_04", "code": "motherboard_power_fault",
+      "name": "Bo mạch chủ lỗi điện", "group": "power_startup",
+      "severity": "CRITICAL", "user_fixable": false,
+      "needs_technician": true
+    },
+    {
+      "id": "DIAG_PWR_05", "code": "ram_loose_or_faulty",
+      "name": "RAM lỏng hoặc hỏng (POST fail)", "group": "power_startup",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["multiple_beeps", "no_display_after_power"],
+      "solution_steps": ["Rút RAM, lau chân, cắm lại", "Chạy MemTest86", "Thay RAM nếu lỗi"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_DSP_01", "code": "loose_display_cable",
+      "name": "Cáp màn hình lỏng", "group": "display",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["screen_black", "external_monitor_ok"],
+      "solution_steps": ["Kết nối màn hình ngoài xác nhận", "Tháo cụm màn hình, cắm lại cáp"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_DSP_02", "code": "gpu_driver_corrupted",
+      "name": "Driver card đồ họa lỗi", "group": "display",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["screen_flickering", "display_after_driver_install", "resolution_wrong"],
+      "solution_steps": ["Boot Safe Mode", "Dùng DDU gỡ driver GPU", "Tải driver chính hãng NVIDIA/AMD/Intel"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_DSP_03", "code": "lcd_panel_defective",
+      "name": "Màn hình LCD hỏng", "group": "display",
+      "severity": "HIGH", "user_fixable": false,
+      "symptoms": ["screen_lines", "screen_white", "backlight_fail"],
+      "solution_steps": ["Thay panel màn hình mới"],
+      "needs_technician": true,
+      "estimated_cost": "2-5 triệu VND"
+    },
+    {
+      "id": "DIAG_DSP_04", "code": "gpu_hardware_failure",
+      "name": "Card đồ họa rời hỏng", "group": "display",
+      "severity": "CRITICAL", "user_fixable": false,
+      "needs_technician": true
+    },
+    {
+      "id": "DIAG_DSP_05", "code": "brightness_setting_issue",
+      "name": "Vấn đề độ sáng màn hình", "group": "display",
+      "severity": "LOW", "user_fixable": true,
+      "solution_steps": ["Fn + brightness up", "Settings > Display > Brightness"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_OS_01", "code": "windows_system_file_corrupt",
+      "name": "File hệ thống Windows bị hỏng", "group": "os_boot",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["safe_mode_fails", "os_freezes_randomly"],
+      "solution_steps": ["sfc /scannow", "DISM /Online /Cleanup-Image /RestoreHealth", "Startup Repair từ USB Windows"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_OS_02", "code": "bad_driver_installed",
+      "name": "Driver hoặc phần mềm gây xung đột", "group": "os_boot",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["bsod_driver_error", "recent_change_caused_issue", "safe_mode_works"],
+      "solution_steps": ["Boot Safe Mode → gỡ driver mới", "Device Manager → Roll Back Driver", "System Restore"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_OS_03", "code": "faulty_ram",
+      "name": "RAM bị lỗi gây BSOD", "group": "os_boot",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["bsod_memory_error"],
+      "solution_steps": ["Windows Memory Diagnostic", "MemTest86 (boot USB)", "Thay RAM nếu lỗi"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_OS_04", "code": "hdd_ssd_causing_bsod",
+      "name": "HDD/SSD gây màn hình xanh", "group": "os_boot",
+      "severity": "CRITICAL", "user_fixable": true,
+      "symptoms": ["bsod_disk_error", "disk_error_sound"],
+      "solution_steps": ["BACKUP DỮ LIỆU NGAY", "CHKDSK /f /r", "Kiểm tra SMART data", "Thay HDD/SSD nếu lỗi"],
+      "warning": "BACKUP DỮ LIỆU TRƯỚC KHI LÀM BẤT CỨ THỨ GÌ",
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_OS_05", "code": "windows_update_boot_loop",
+      "name": "Boot loop sau Windows Update", "group": "os_boot",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["boot_loop", "recent_windows_update"],
+      "solution_steps": ["Ngắt điện 3 lần → WinRE", "WinRE → Uninstall Updates", "Startup Repair"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_OS_06", "code": "mbr_bootloader_corrupt",
+      "name": "MBR hoặc Boot Sector bị hỏng", "group": "os_boot",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["windows_not_loading", "safe_mode_fails"],
+      "solution_steps": ["Boot USB Windows", "bootrec /fixmbr", "bootrec /fixboot", "bootrec /rebuildbcd"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_NET_01", "code": "wifi_driver_problem",
+      "name": "Driver Wi-Fi lỗi", "group": "network",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["wifi_not_visible", "wifi_slow"],
+      "solution_steps": ["Device Manager → Update Wi-Fi Driver", "Gỡ cài lại driver", "Tải driver từ website hãng"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_NET_02", "code": "wifi_adapter_hardware_fail",
+      "name": "Wi-Fi adapter phần cứng hỏng", "group": "network",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["wifi_not_visible", "wifi_adapter_missing"],
+      "solution_steps": ["Kiểm tra BIOS có disable Wi-Fi không", "Dùng USB Wi-Fi adapter", "Thay card Wi-Fi M.2"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_NET_03", "code": "dns_configuration_error",
+      "name": "Cấu hình DNS bị lỗi", "group": "network",
+      "severity": "LOW", "user_fixable": true,
+      "symptoms": ["wifi_connected_no_internet", "dns_error_message"],
+      "solution_steps": ["Đổi DNS sang 8.8.8.8 / 8.8.4.4", "ipconfig /flushdns"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_NET_04", "code": "router_or_isp_problem",
+      "name": "Router hoặc nhà mạng lỗi", "group": "network",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["wifi_connected_no_internet", "other_devices_same_wifi_fail"],
+      "solution_steps": ["Tắt Router 30 giây bật lại", "Kiểm tra đèn Router", "Gọi nhà mạng"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_NET_05", "code": "network_stack_corrupted",
+      "name": "Network Stack TCP/IP hỏng", "group": "network",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["wifi_connected_no_internet", "ethernet_no_internet"],
+      "solution_steps": ["netsh winsock reset", "netsh int ip reset", "ipconfig /release & /renew", "Restart"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_NET_06", "code": "ip_address_conflict",
+      "name": "Xung đột địa chỉ IP", "group": "network",
+      "severity": "LOW", "user_fixable": true,
+      "symptoms": ["ip_conflict", "wifi_connected_no_internet"],
+      "solution_steps": ["ipconfig /release → /renew", "Đổi về DHCP tự động", "Restart router"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_AUD_01", "code": "audio_driver_problem",
+      "name": "Driver âm thanh lỗi", "group": "audio_camera",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["no_sound", "audio_driver_yellow_mark"],
+      "solution_steps": ["Device Manager → Uninstall audio device", "Restart", "Tải driver Realtek từ website hãng"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_AUD_02", "code": "audio_muted_or_disabled",
+      "name": "Âm thanh bị tắt hoặc thiết bị disabled", "group": "audio_camera",
+      "severity": "LOW", "user_fixable": true,
+      "symptoms": ["no_sound"],
+      "solution_steps": ["Kiểm tra volume và mute", "Sound Settings → Enable playback device", "Volume Mixer"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_AUD_03", "code": "audio_hardware_failure",
+      "name": "Phần cứng âm thanh hỏng", "group": "audio_camera",
+      "severity": "HIGH", "user_fixable": false,
+      "symptoms": ["no_sound", "audio_device_missing"],
+      "solution_steps": ["Dùng loa/tai nghe USB ngoài", "Kỹ thuật viên kiểm tra soundcard"],
+      "needs_technician": true
+    },
+    {
+      "id": "DIAG_CAM_01", "code": "camera_blocked_by_privacy",
+      "name": "Camera bị chặn bởi Privacy Windows", "group": "audio_camera",
+      "severity": "LOW", "user_fixable": true,
+      "symptoms": ["camera_not_detected", "camera_privacy_blocked"],
+      "solution_steps": ["Settings → Privacy & Security → Camera → Bật On"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_CAM_02", "code": "camera_driver_problem",
+      "name": "Driver camera lỗi", "group": "audio_camera",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["camera_not_detected"],
+      "solution_steps": ["Device Manager → Cameras → Update driver", "Tải driver từ website hãng"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PER_01", "code": "usb_port_physically_damaged",
+      "name": "Cổng USB bị hỏng vật lý", "group": "peripherals",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["usb_not_detected", "specific_usb_port_fail", "usb_device_works_on_other_pc"],
+      "solution_steps": ["Dùng cổng USB khác", "USB Hub có nguồn riêng", "Kỹ thuật thay cổng USB"],
+      "needs_technician": true
+    },
+    {
+      "id": "DIAG_PER_02", "code": "usb_controller_driver_failed",
+      "name": "USB Controller driver lỗi", "group": "peripherals",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["usb_not_detected", "all_usb_ports_fail"],
+      "solution_steps": ["DM → Universal Serial Bus Controllers → Uninstall all", "Restart", "Cài chipset driver"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PER_03", "code": "usb_device_itself_faulty",
+      "name": "Thiết bị USB bị hỏng", "group": "peripherals",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["usb_not_detected", "usb_device_fails_all_ports"],
+      "solution_steps": ["Thay thiết bị USB mới"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PER_04", "code": "peripheral_driver_missing",
+      "name": "Driver thiết bị ngoại vi lỗi", "group": "peripherals",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["usb_device_error"],
+      "solution_steps": ["Device Manager → Update Driver", "Tải driver từ nhà sản xuất thiết bị"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PERF_01", "code": "thermal_throttling_overheating",
+      "name": "Quá nhiệt gây giảm hiệu năng", "group": "performance",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["laptop_very_hot", "fan_very_loud", "high_cpu_usage"],
+      "solution_steps": ["Thổi bụi lỗ thoáng", "Đặt máy trên bề mặt cứng", "Vệ sinh tản nhiệt", "Thay keo tản nhiệt"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PERF_02", "code": "malware_virus_infection",
+      "name": "Nhiễm malware/virus gây chậm", "group": "performance",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["high_cpu_usage", "malware_suspected"],
+      "solution_steps": ["Windows Defender Full Scan", "Malwarebytes scan", "Boot Safe Mode và quét lại"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PERF_03", "code": "too_many_startup_programs",
+      "name": "Quá nhiều chương trình khởi động", "group": "performance",
+      "severity": "LOW", "user_fixable": true,
+      "symptoms": ["slow_boot_time", "startup_programs_many"],
+      "solution_steps": ["Task Manager → Startup → Disable", "msconfig → Services", "Settings → Apps → Startup"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PERF_04", "code": "insufficient_ram",
+      "name": "RAM không đủ cho tác vụ", "group": "performance",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["high_memory_usage", "system_very_slow"],
+      "solution_steps": ["Đóng app không dùng", "Tắt hiệu ứng visual Windows", "Nâng cấp RAM"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_STR_01", "code": "disk_space_exhaustion",
+      "name": "Ổ đĩa C: quá đầy", "group": "storage",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["disk_full", "system_very_slow", "high_disk_usage"],
+      "solution_steps": ["Disk Cleanup → System Files", "Gỡ app ít dùng", "WinDirStat tìm file lớn", "Di chuyển file sang ổ khác"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_STR_02", "code": "hdd_mechanical_failure",
+      "name": "HDD cơ học đang hỏng", "group": "storage",
+      "severity": "CRITICAL", "user_fixable": true,
+      "symptoms": ["disk_error_sound", "bad_sectors_detected", "file_corruption"],
+      "solution_steps": ["BACKUP NGAY LẬP TỨC", "CrystalDiskInfo kiểm tra SMART", "Clone ổ cũ sang ổ mới", "Thay HDD/SSD"],
+      "warning": "URGENT: Backup dữ liệu ngay trước khi mất",
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_STR_03", "code": "ssd_performance_degraded",
+      "name": "SSD suy giảm hiệu năng", "group": "storage",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["ssd_health_low", "slow_file_transfer"],
+      "solution_steps": ["Kích hoạt TRIM", "Update firmware SSD", "Tránh để SSD đầy >90%", "Lên kế hoạch thay SSD"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_STR_04", "code": "file_system_corruption",
+      "name": "File system NTFS bị lỗi", "group": "storage",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["file_corruption", "chkdsk_errors", "disk_not_detected"],
+      "solution_steps": ["chkdsk C: /f /r /x", "Khởi động lại để chkdsk chạy", "Backup trước khi chkdsk"],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_BT_01", "code": "bluetooth_disabled",
+      "name": "Bluetooth bị tắt trong Settings hoặc BIOS",
+      "group": "peripherals",
+      "severity": "LOW", "user_fixable": true,
+      "symptoms": ["bluetooth_not_working", "bt_toggle_off"],
+      "solution_steps": [
+        "Nháp vào Bluetooth icon trong taskbar và bật",
+        "Settings → Bluetooth & devices → bật Bluetooth",
+        "Kiểm tra BIOS: Wireless → Bluetooth → Enabled",
+        "Kiểm tra phín tắt cứng Bluetooth trên máy"
+      ],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_BT_02", "code": "bluetooth_driver_or_adapter_fail",
+      "name": "Driver Bluetooth lỗi hoặc Adapter không được nhận",
+      "group": "peripherals",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["bluetooth_not_working", "bt_adapter_missing"],
+      "solution_steps": [
+        "Device Manager → Bluetooth → Uninstall device → Restart",
+        "Tải driver Bluetooth từ website hãng (Intel, Realtek, Qualcomm...)",
+        "Nếu vẫn lỗi: dùng USB Bluetooth Dongle như giải pháp tạm thời"
+      ],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_BT_03", "code": "bluetooth_pairing_conflict",
+      "name": "Xung đột Bluetooth / Pairing không ổn định",
+      "group": "peripherals",
+      "severity": "LOW", "user_fixable": true,
+      "symptoms": ["bluetooth_not_working", "bt_unstable_connection"],
+      "solution_steps": [
+        "Xóa thiết bị khỏi danh sách paired và pair lại",
+        "Tắt Bluetooth → Bật lại → scan lại",
+        "Cập nhật driver Bluetooth",
+        "Kiểm tra thiết bị Bluetooth có đủ pin không"
+      ],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_TOUCH_01", "code": "touchpad_disabled_or_driver_fail",
+      "name": "Touchpad bị vô hiệu hóa hoặc Driver lỗi",
+      "group": "peripherals",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["touchpad_not_working"],
+      "solution_steps": [
+        "Nhấn Fn + F6/F9 (tùy hãng máy) để bật/tắt touchpad",
+        "Settings → Bluetooth & devices → Touchpad → On",
+        "Device Manager → Human Interface Devices → Uninstall touchpad → Restart",
+        "Tải driver touchpad từ website hãng (Synaptics, Elan, ASUS...)"
+      ],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_TOUCH_02", "code": "touchpad_hardware_failure",
+      "name": "Touchpad hỏng phần cứng",
+      "group": "peripherals",
+      "severity": "HIGH", "user_fixable": false,
+      "symptoms": ["touchpad_not_working", "touchpad_not_detected_hw"],
+      "solution_steps": [
+        "Dùng chuột ngoài trong thời gian chờ sửa",
+        "Kỹ thuật viên kiểm tra và thay touchpad"
+      ],
+      "needs_technician": true
+    },
+    {
+      "id": "DIAG_SHTDN_01", "code": "thermal_shutdown",
+      "name": "Tắt đột ngột do quá nhiệt (Thermal Shutdown)",
+      "group": "power_startup",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["machine_shuts_down_abruptly", "shuts_under_load", "overheats_before_shutdown"],
+      "solution_steps": [
+        "Vệ sinh lỗ thoáng và quạt tản nhiệt",
+        "Thay keo tản nhiệt CPU",
+        "Chạy Prime95 để kiểm tra nhiệt độ tối đa",
+        "Đặt máy trên bề mặt cứng, thoáng gió",
+        "Giảm hiệu năng tác vụ nặng trong thời gian chờ vệ sinh"
+      ],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_SHTDN_02", "code": "power_transition_failure",
+      "name": "Tắt khi thay đổi nguồn — lỗi pin hoặc adapter",
+      "group": "power_startup",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["machine_shuts_down_abruptly", "shuts_on_charge_change"],
+      "solution_steps": [
+        "Chạy powercfg /batteryreport để kiểm tra sức khỏe pin",
+        "Thay adapter nếu địện thế không ổn định",
+        "Kiểm tra cổng sạc có bị lỏng không",
+        "Thay pin nếu health < 70%"
+      ],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_SHTDN_03", "code": "random_shutdown_hardware",
+      "name": "Tắt ngẫu nhiên không rõ nguyên nhân — kiểm tra PSU/RAM/Bo mạch",
+      "group": "power_startup",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["machine_shuts_down_abruptly", "shuts_randomly", "no_thermal_before_shutdown"],
+      "solution_steps": [
+        "Kiểm tra PSU bằng Paperclip Test (Desktop)",
+        "Chạy MemTest86 qua USB để kiểm tra RAM",
+        "Kiểm tra tụ điện trên bo mạch chủ có phồng không",
+        "Quan sát Event Viewer → Windows Logs → System để tìm warning"
+      ],
+      "needs_technician": true
+    },
+    {
+      "id": "DIAG_BIOS_01", "code": "bios_disk_not_detected",
+      "name": "BIOS không nhận Ổ đĩa — lỗi kết nối hoặc cài đặt BIOS",
+      "group": "storage",
+      "severity": "HIGH", "user_fixable": true,
+      "symptoms": ["disk_not_in_bios", "new_disk_not_detected"],
+      "solution_steps": [
+        "Kiểm tra cáp SATA và cổng SATA trên mainboard",
+        "Vào BIOS: Storage Configuration → chẹ AHCI (không dùng IDE)",
+        "NVMe: BIOS → Boot → CSM Support → Disabled (cần cho NVMe)",
+        "NVMe: BIOS → Storage → M.2 Slot → Enabled",
+        "Cắm lại ổ cứng, kiểm tra bu-lông vật cố ổ NVMe"
+      ],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_PER_EXT_01", "code": "peripheral_boot_short_circuit",
+      "name": "Thiết bị ngoại vi gây lỗi khi khởi động",
+      "group": "peripherals",
+      "severity": "MEDIUM", "user_fixable": true,
+      "symptoms": ["machine_shuts_down_abruptly"],
+      "solution_steps": [
+        "Rút từng thiết bị ngoại vi một và thử khởi động để tìm thiết bị lỗi",
+        "Thử cổng USB khác cho thiết bị gây vấn đề",
+        "Cập nhật driver của thiết bị ngoại vi"
+      ],
+      "needs_technician": false
+    },
+    {
+      "id": "DIAG_NEED_TECH",
+      "code": "needs_technician_assessment",
+      "name": "Cần kỹ thuật viên kiểm tra trực tiếp",
+      "group": "general",
+      "severity": "HIGH",
+      "user_fixable": false,
+      "symptoms": [],
+      "solution_steps": [
+        "Mang máy đến trung tâm bảo hành hoặc kỹ thuật viên chuyên nghiệp",
+        "Chuẩn bị mô tả chi tiết triệu chứng và thời điểm xảy ra lỗi",
+        "Backup dữ liệu quan trọng trước khi đem sửa"
+      ],
+      "needs_technician": true,
+      "default_cf": 0.70
+    }
+  ]
+}

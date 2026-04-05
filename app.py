@@ -1,450 +1,563 @@
 """
-Computer Expert System - Flask Application (Hybrid)
+app.py — Flask Web Expert System: PC Diagnostic Chat
 
-Supports TWO modes:
-1. GUIDED MODE (/diagnose) — Original QuestionFlow with yes/no buttons
-2. HYBRID MODE (/chat)    — NLP + backward chaining + chatbot-style UI
+Routes:
+  GET  /              → Render chat UI
+  POST /start         → Tạo session mới, trả Q01
+  POST /message       → Nhận text user, NLU → facts → inference
+  POST /select        → User click option (single_choice / yes_no)
+  POST /submit        → User submit multi_choice
+  GET  /explanation   → Trả full explanation của session
+  POST /reset         → Reset / restart session
+  GET  /status        → Health check + KB stats
 
-Flask routes contain NO inference logic — all delegated to InferenceService.
+Port: 5000 (Flask default)
 """
 
 import os
 import sys
-import time
-import json
-import logging
+from pathlib import Path
 
-from flask import (
-    Flask, render_template, request, session,
-    redirect, url_for, jsonify
+# Đảm bảo import từ project root
+PROJECT_ROOT = Path(__file__).parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from flask import Flask, request, jsonify, render_template, abort
+
+from engine.diagnostic_session import KnowledgeBaseLoader
+from engine.question_selector import QuestionSelector
+from engine.explanation_builder import build_short_explanation, build_full_explanation
+from nlu.intent_classifier import IntentClassifier
+from nlu.fact_extractor import FactExtractor
+from nlu.patterns import (
+    GREETING_MESSAGE, UNDERSTOOD_TEMPLATES,
+    UNCERTAIN_MESSAGE, FACTS_UNDERSTOOD_PREFIX
 )
-
-# Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from engine.question_controller import QuestionController
-from engine.inference_service import InferenceService
-from engine.state_manager import StateManager
-from utils.nlp_parser import parse_input, get_nlp_summary
-from utils.answer_interpreter import interpret_answer
-from utils.response_generator import get_natural_acknowledgment, get_nlp_natural_summary
-
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-app = Flask(
-    __name__,
-    template_folder='web/templates',
-    static_folder='web/static'
-)
-app.secret_key = 'computer_expert_system_secret_key_2024'
-
-# Initialize shared components
-question_controller = QuestionController()
-inference_service = InferenceService()
-
-
-# ═══════════════════════════════════════════════════════
-#  HOME
-# ═══════════════════════════════════════════════════════
-
-@app.route('/')
-def index():
-    """Homepage - choose between guided and hybrid mode."""
-    session.clear()
-    return render_template('index.html')
-
-
-# ═══════════════════════════════════════════════════════
-#  GUIDED MODE (original, preserved)
-# ═══════════════════════════════════════════════════════
-
-@app.route('/diagnose', methods=['GET', 'POST'])
-def diagnose():
-    """Original guided question flow (backward-compatible)."""
-    if request.method == 'GET':
-        if 'current_step' not in session:
-            session['current_step'] = question_controller.get_first_step()
-            session['answers'] = {}
-            session['start_time'] = time.time()
-            session['question_count'] = 0
-            session['pending_question'] = None
-            session['pending_rule_id'] = None
-            session['pending_missing'] = None
-
-        pending_q = session.get('pending_question')
-        if pending_q:
-            question_number = session.get('question_count', 0) + 1
-            return render_template('question.html',
-                                   question=pending_q,
-                                   question_number=question_number,
-                                   answers=session.get('answers', {}))
-
-        current_step = session['current_step']
-
-        if current_step == 'END':
-            return redirect(url_for('result'))
-
-        if str(current_step).startswith('R'):
-            session['flow_rule_id'] = current_step
-            return redirect(url_for('result'))
-
-        question_data = question_controller.get_question_for_step(current_step)
-        if not question_data:
-            return redirect(url_for('result'))
-
-        question_number = session.get('question_count', 0) + 1
-        return render_template('question.html',
-                               question=question_data,
-                               question_number=question_number,
-                               answers=session.get('answers', {}))
-
-    elif request.method == 'POST':
-        answer_value = request.form.get('answer')
-        if answer_value is None:
-            return redirect(url_for('diagnose'))
-
-        answer = (answer_value == 'yes')
-
-        # Handle pending question
-        pending_q = session.get('pending_question')
-        pending_rule_id = session.get('pending_rule_id')
-        pending_missing = session.get('pending_missing', [])
-
-        if pending_q and pending_rule_id:
-            answers = dict(session.get('answers', {}))
-            answered_code = pending_q['question_code']
-            answers[answered_code] = answer
-            session['answers'] = answers
-            session['question_count'] = session.get('question_count', 0) + 1
-
-            remaining_missing = [c for c in pending_missing if c != answered_code]
-
-            if remaining_missing:
-                next_code = remaining_missing[0]
-                next_q = question_controller._make_question_for_symptom(
-                    next_code, pending_rule_id
-                )
-                session['pending_question'] = next_q
-                session['pending_missing'] = remaining_missing
-                return redirect(url_for('diagnose'))
-            else:
-                session['pending_question'] = None
-                session['pending_missing'] = None
-                session['flow_rule_id'] = pending_rule_id
-                session['pending_rule_id'] = None
-                return redirect(url_for('result'))
-
-        # Normal flow
-        current_step = session.get('current_step', '1')
-        nav = question_controller.process_answer(
-            current_step, answer, dict(session.get('answers', {}))
-        )
-
-        if nav is None:
-            return redirect(url_for('result'))
-
-        session['answers'] = nav['updated_answers']
-        session['question_count'] = session.get('question_count', 0) + 1
-
-        if nav.get('pending_question'):
-            session['pending_question'] = nav['pending_question']
-            session['pending_rule_id'] = nav['pending_rule_id']
-            session['pending_missing'] = nav['pending_missing']
-            return redirect(url_for('diagnose'))
-
-        if nav['is_rule']:
-            session['flow_rule_id'] = nav['rule_id']
-            session['current_step'] = nav['next_step']
-            return redirect(url_for('result'))
-        elif nav['is_end']:
-            session['current_step'] = 'END'
-            return redirect(url_for('result'))
-        else:
-            session['current_step'] = nav['next_step']
-            return redirect(url_for('diagnose'))
-
-
-@app.route('/result')
-def result():
-    """Guided mode result page."""
-    answers = session.get('answers', {})
-    flow_rule_id = session.get('flow_rule_id')
-    question_count = session.get('question_count', 0)
-    start_time = session.get('start_time')
-
-    if not answers:
-        return redirect(url_for('index'))
-
-    session_time_s = round(time.time() - start_time, 1) if start_time else 0
-
-    diagnosis = inference_service.run_quick_diagnosis(
-        answers, rule_id=flow_rule_id
-    )
-
-    debug_mode = request.args.get('debug', 'false').lower() == 'true'
-
-    return render_template('result.html',
-                           diagnosis=diagnosis,
-                           answers=answers,
-                           question_count=question_count,
-                           session_time_s=session_time_s,
-                           debug_mode=debug_mode)
-
-
-# ═══════════════════════════════════════════════════════
-#  HYBRID MODE (NEW — chatbot-style)
-# ═══════════════════════════════════════════════════════
-
-@app.route('/chat')
-def chat():
-    """Hybrid mode chat page."""
-    session.clear()
-    state = StateManager()
-    session['hybrid_state'] = state.to_dict()
-    session['chat_messages'] = []
-    session['chat_mode'] = 'initial'  # initial | asking | done
-    return render_template('chat.html')
-
-
-@app.route('/chat/send', methods=['POST'])
-def chat_send():
-    """
-    Handle chat input (text or yes/no button).
-    Returns JSON for AJAX updates.
-
-    Input processing pipeline (3-tier):
-    1. Button click (answer + question_code) — direct fact
-    2. Contextual answer interpreter (if current_question exists) — 'có'/'không'
-    3. NLP free-text parser — keyword extraction
-    4. Clarification fallback — ask user to rephrase
-    """
-    data = request.get_json() or {}
-    user_input = data.get('message', '').strip()
-    answer_value = data.get('answer')  # 'yes' or 'no' for button clicks
-    current_question_code = data.get('question_code')
-
-    # Restore state
-    state_data = session.get('hybrid_state')
-    if not state_data:
-        return jsonify({'error': 'Session expired', 'redirect': url_for('chat')})
-
-    state = StateManager.from_dict(state_data)
-    messages = session.get('chat_messages', [])
-
-    # Track how the input was resolved (for debug)
-    input_source = None
-    resolved_fact_code = None
-    resolved_fact_value = None
-
-    # ════════════════════════════════════════════
-    #  TIER 1: Button click (yes/no)
-    # ════════════════════════════════════════════
-    if answer_value and current_question_code:
-        fact_value = (answer_value == 'yes')
-        state.add_fact(current_question_code, fact_value)
-        state.mark_asked(current_question_code)
-        state.clear_current_question()
-
-        user_msg = "Có ✅" if fact_value else "Không ❌"
-        messages.append({'role': 'user', 'text': user_msg})
-
-        input_source = 'button_click'
-        resolved_fact_code = current_question_code
-        resolved_fact_value = fact_value
-
-    elif user_input:
-        messages.append({'role': 'user', 'text': user_input})
-
-        # ════════════════════════════════════════
-        #  TIER 2: Contextual answer interpreter
-        #  (only if there's an active question)
-        # ════════════════════════════════════════
-        active_q = state.current_question
-        interpretation = None
-
-        if active_q:
-            interpretation = interpret_answer(user_input, active_q)
-
-        if interpretation is not None:
-            # Successfully interpreted in context
-            fact_value = interpretation['value']
-            state.add_fact(active_q, fact_value)
-            state.mark_asked(active_q)
-            state.clear_current_question()
-
-            ack_text = get_natural_acknowledgment(active_q, fact_value, is_contextual=True)
-            messages.append({
-                'role': 'system',
-                'text': f'✅ {ack_text}'
-            })
-
-            input_source = f'contextual_answer ({interpretation["source"]})'
-            resolved_fact_code = active_q
-            resolved_fact_value = fact_value
-
-        else:
-            # ════════════════════════════════════
-            #  TIER 3: NLP free-text parser
-            # ════════════════════════════════════
-            extracted = parse_input(user_input)
-
-            if extracted:
-                state.add_facts(extracted)
-                for code in extracted:
-                    state.mark_asked(code)
-
-                # If the active question was answered by NLP, clear it
-                if active_q and active_q in extracted:
-                    state.clear_current_question()
-
-                summary_text = get_nlp_natural_summary(extracted)
-                messages.append({'role': 'system', 'text': summary_text})
-
-                input_source = 'nlp_parser'
-                # Report first extracted fact for debug
-                first_code = list(extracted.keys())[0]
-                resolved_fact_code = first_code
-                resolved_fact_value = extracted[first_code]
-
-            else:
-                # ════════════════════════════════
-                #  TIER 4: Clarification fallback
-                # ════════════════════════════════
-                if active_q:
-                    messages.append({
-                        'role': 'system',
-                        'text': '🤔 Xin lỗi, tôi chưa hiểu rõ. '
-                                'Bạn có thể trả lời bằng **"có"** hoặc **"không"**, '
-                                'hoặc mô tả rõ hơn một chút.'
-                    })
-                    input_source = 'clarification_with_question'
-                else:
-                    messages.append({
-                        'role': 'system',
-                        'text': '🤔 Tôi chưa nhận diện được triệu chứng từ mô tả. '
-                                'Hãy để tôi hỏi thêm một số câu hỏi.'
-                    })
-                    input_source = 'clarification_no_question'
-    else:
-        return jsonify({'error': 'No input provided'})
-
-    # ══════════════════════════════════════════════
-    #  Run Hybrid Step (forward → backward chain)
-    # ══════════════════════════════════════════════
-    step_result = inference_service.run_hybrid_step(state)
-
-    # ── Build Response ──
-    response = {'messages': []}
-
-    if step_result['status'] == 'diagnosed':
-        diagnosis = step_result['diagnosis']
-        explanation = step_result['explanation']
-
-        messages.append({
-            'role': 'result',
-            'text': f"🎯 Đã xác định nguyên nhân!",
-            'diagnosis': {
-                'rule_id': diagnosis['rule_id'],
-                'cause': diagnosis['cause'],
-                'solution': diagnosis['solution'],
-                'diagnosis_time_ms': diagnosis['diagnosis_time_ms'],
-                'questions_asked': diagnosis['questions_asked'],
-                'all_matches_count': len(diagnosis['all_matches']),
-                'decision_source': diagnosis['decision_source'],
-            },
-            'explanation': explanation
-        })
-
-        session['chat_mode'] = 'done'
-        response['status'] = 'diagnosed'
-        response['diagnosis'] = diagnosis
-        response['explanation'] = explanation
-
-    elif step_result['status'] == 'need_input':
-        question = step_result['question']
-        candidates = step_result['candidates_remaining']
-
-        # ── Store current_question in state ──
-        state.set_current_question(question['question_code'])
-
-        messages.append({
-            'role': 'question',
-            'text': question['question_text'],
-            'question_code': question['question_code'],
-            'group': question['group'],
-            'reason': question['reason'],
-            'candidates_remaining': candidates
-        })
-
-        session['chat_mode'] = 'asking'
-        response['status'] = 'need_input'
-        response['question'] = question
-        response['candidates_remaining'] = candidates
-
-    else:  # no_more_questions
-        diagnosis = step_result['diagnosis']
-        messages.append({
-            'role': 'result',
-            'text': '🤔 ' + diagnosis['cause'],
-            'diagnosis': {
-                'rule_id': None,
-                'cause': diagnosis['cause'],
-                'solution': diagnosis['solution'],
-                'diagnosis_time_ms': diagnosis['diagnosis_time_ms'],
-                'questions_asked': diagnosis['questions_asked'],
-                'all_matches_count': 0,
-                'decision_source': 'fallback',
+from services.session_store import SessionStore
+
+# ─────────────────────────────────────────────────────────────
+# App Setup
+# ─────────────────────────────────────────────────────────────
+
+app = Flask(__name__)
+app.config["JSON_AS_ASCII"] = False  # Giữ tiếng Việt trong JSON response
+app.config["JSONIFY_MIMETYPE"] = "application/json; charset=utf-8"
+
+# Paths
+DATA_DIR = PROJECT_ROOT / "data"
+QUESTIONS_PATH = DATA_DIR / "06_questions.json"
+RULES_PATH = DATA_DIR / "07_rules_and_diagnoses.json"
+
+# Global singletons (init khi startup)
+kb: KnowledgeBaseLoader = None
+store: SessionStore = None
+question_selector: QuestionSelector = None
+intent_clf: IntentClassifier = None
+fact_extractor: FactExtractor = None
+
+
+def init_app():
+    """Khởi tạo Knowledge Base và các services."""
+    global kb, store, question_selector, intent_clf, fact_extractor
+
+    print("⏳ Loading Knowledge Base...")
+    kb = KnowledgeBaseLoader(str(QUESTIONS_PATH), str(RULES_PATH))
+    print(f"✅ KB loaded: {kb.stats}")
+
+    store = SessionStore(kb)
+    question_selector = QuestionSelector(kb.questions, kb.diagnoses)
+    intent_clf = IntentClassifier()
+    fact_extractor = FactExtractor()
+    print("✅ All services initialized")
+
+
+# ─────────────────────────────────────────────────────────────
+# Helper Functions
+# ─────────────────────────────────────────────────────────────
+
+def _format_question(q: dict) -> dict:
+    """Format câu hỏi để gửi về frontend."""
+    if not q:
+        return None
+    return {
+        "id": q["id"],
+        "text": q["text"],
+        "type": q.get("type", "single_choice"),
+        "options": [
+            {
+                "value": opt["value"],
+                "label": opt["label"],
             }
-        })
-
-        session['chat_mode'] = 'done'
-        response['status'] = 'no_match'
-        response['diagnosis'] = diagnosis
-
-    # Save state
-    session['hybrid_state'] = state.to_dict()
-    session['chat_messages'] = messages
-
-    # Enhanced debug info
-    response['debug'] = {
-        'input_source': input_source,
-        'resolved_fact': f'{resolved_fact_code} = {resolved_fact_value}' if resolved_fact_code else None,
-        'current_question': state.current_question,
-        'facts': state.facts,
-        'candidates_count': len(state.candidate_rules),
-        'asked_count': len(state.asked),
-        'history': state.history[-5:]
+            for opt in q.get("options", [])
+        ],
+        "purpose": q.get("purpose", ""),
     }
 
-    response['messages'] = messages
 
-    return jsonify(response)
+def _build_bot_message(
+    question: dict,
+    prefix: str = "",
+    understood_msg: str = "",
+    short_explanation: str = "",
+) -> str:
+    """Xây dựng bot message từ các thành phần."""
+    parts = []
+    if prefix:
+        parts.append(prefix)
+    if understood_msg:
+        parts.append(understood_msg)
+    if question:
+        q_text = question.get("text", "")
+        if q_text:
+            parts.append(q_text)
+    if short_explanation:
+        parts.append(short_explanation)
+    return "\n\n".join(filter(None, parts))
 
 
-@app.route('/chat/state')
-def chat_state():
-    """Get current chat state (for page reload)."""
+def _get_ext_session_or_404(session_id: str):
+    """Lấy ExtendedSession hoặc trả lỗi 404."""
+    ext = store.get(session_id)
+    if not ext:
+        abort(404, description="Phiên chẩn đoán không tồn tại hoặc đã hết hạn.")
+    return ext
+
+
+def _match_text_to_option(text: str, question: dict, extracted_facts: list[str]) -> str | None:
+    """
+    Cố gắng map text người dùng → value của một option trong câu hỏi hiện tại.
+
+    Chiến lược (theo thứ tự ưu tiên):
+    1. Nếu extracted_facts giao với adds_facts của option → match
+    2. Nếu label của option xuất hiện trong text (case-insensitive) → match
+    3. Nếu value của option (A/B/C...) xuất hiện độc lập trong text → match
+
+    Return: option value ('A', 'B', ...) hoặc None
+    """
+    text_lower = text.lower().strip()
+    best_match = None
+    best_score = 0
+
+    for opt in question.get("options", []):
+        val = opt.get("value", "")
+        if val == "SUBMIT":
+            continue
+        score = 0
+
+        # Chiến lược 1: fact overlap (ưu tiên cao nhất)
+        opt_facts = set(opt.get("adds_facts", []))
+        if opt_facts and extracted_facts:
+            overlap = opt_facts & set(extracted_facts)
+            if overlap:
+                score += len(overlap) * 10
+
+        # Chiến lược 2: label match
+        label = opt.get("label", "").lower()
+        if label and len(label) > 1:
+            # Tách các từ chốt trong label và kiểm tra xuất hiện trong text
+            label_words = [w for w in label.split() if len(w) > 2]
+            hits = sum(1 for w in label_words if w in text_lower)
+            if hits > 0:
+                score += hits * 2
+
+        # Chiến lược 3: option value letter (e.g. user types 'A' or 'B')
+        import re
+        if re.fullmatch(r'[a-zA-Z]', text.strip()) and text.strip().upper() == val:
+            score += 5
+
+        if score > best_score:
+            best_score = score
+            best_match = val
+
+    return best_match if best_score >= 2 else None
+
+
+def _make_question_response(ext, prefix="", understood_msg="", facts_added=None):
+    """
+    Tạo response chuẩn khi gửi câu hỏi tiếp theo.
+    Bao gồm short_explanation từ dynamic questioning.
+    """
+    ds = ext.ds
+    q = ds.get_current_question()
+
+    # Dynamic questioning: lấy near-fire rules để tính explanation
+    near_fire = ds.engine.get_near_fire_rules(3)
+
+    short_exp = ""
+    if q:
+        short_exp = build_short_explanation(q, near_fire, ds.current_group)
+
+    bot_msg = _build_bot_message(
+        q,
+        prefix=prefix,
+        understood_msg=understood_msg,
+        short_explanation=short_exp,
+    )
+
     return jsonify({
-        'messages': session.get('chat_messages', []),
-        'mode': session.get('chat_mode', 'initial')
+        "session_id": ext.session_id,
+        "session_complete": ds.is_complete,
+        "bot_message": bot_msg,
+        "question": _format_question(q) if q else None,
+        "input_mode": ds.expected_input_mode if not ds.is_complete else None,
+        "facts_added": facts_added or [],
+        "current_group": ds.current_group,
+        "top_diagnoses": ds.engine.get_top_diagnoses(3),
+        "wm_size": len(ds.engine.wm.facts),
     })
 
 
-# ═══════════════════════════════════════════════════════
-#  COMMON
-# ═══════════════════════════════════════════════════════
+def _make_diagnosis_response(ext, result: dict):
+    """Tạo response khi session hoàn tất → hiển thị diagnosis card."""
+    ds = ext.ds
+    top = ds.engine.get_top_diagnoses(3)
 
-@app.route('/reset')
-def reset():
-    """Reset the session and go home."""
-    session.clear()
-    return redirect(url_for('index'))
+    # Primary diagnosis
+    primary = top[0] if top else None
+    if not primary and ds.final_diagnoses:
+        primary = ds.final_diagnoses[0]
+
+    return jsonify({
+        "session_id": ext.session_id,
+        "session_complete": True,
+        "bot_message": _build_completion_message(primary),
+        "question": None,
+        "input_mode": None,
+        "diagnoses": top,
+        "primary_diagnosis": primary,
+        "facts_added": result.get("new_facts", []),
+        "current_group": ds.current_group,
+        "wm_size": len(ds.engine.wm.facts),
+    })
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+def _build_completion_message(primary: dict | None) -> str:
+    if not primary:
+        return "✅ Phân tích hoàn tất. Không xác định được nguyên nhân cụ thể — vui lòng mang đến kỹ thuật viên."
+
+    name = primary.get("name", "Lỗi không xác định")
+    cf = primary.get("cf_percent", 0)
+    severity = primary.get("severity", "UNKNOWN")
+
+    severity_emoji = {
+        "CRITICAL": "🔴",
+        "HIGH": "🟠",
+        "MEDIUM": "🟡",
+        "LOW": "🟢",
+    }.get(severity, "⚪")
+
+    msg = f"✅ **Chẩn đoán hoàn tất!**\n\n"
+    msg += f"{severity_emoji} **{name}** (Độ tin cậy: {cf}%)\n\n"
+
+    steps = primary.get("solution_steps", [])
+    if steps:
+        msg += "**Hướng xử lý:**\n"
+        for s in steps[:3]:
+            msg += f"• {s}\n"
+
+    if primary.get("needs_technician"):
+        msg += "\n⚠️ Nên mang máy đến kỹ thuật viên."
+    elif primary.get("warning"):
+        msg += f"\n⚠️ {primary['warning']}"
+
+    return msg.strip()
+
+
+# ─────────────────────────────────────────────────────────────
+# Routes
+# ─────────────────────────────────────────────────────────────
+
+@app.route("/")
+def index():
+    """Render chat UI."""
+    return render_template("chat.html", kb_stats=kb.stats if kb else {})
+
+
+@app.route("/start", methods=["POST"])
+def start_session():
+    """
+    Tạo phiên chẩn đoán mới.
+    Response: session_id + câu hỏi đầu tiên (Q01)
+    """
+    ext = store.create()
+    ds = ext.ds
+
+    q = ds.get_current_question()
+    bot_msg = GREETING_MESSAGE
+
+    return jsonify({
+        "session_id": ext.session_id,
+        "session_complete": False,
+        "bot_message": bot_msg,
+        "question": _format_question(q),
+        "input_mode": ds.expected_input_mode,
+        "facts_added": [],
+        "current_group": None,
+        "top_diagnoses": [],
+        "wm_size": 0,
+    })
+
+
+@app.route("/message", methods=["POST"])
+def handle_message():
+    """
+    Nhận text tự do từ người dùng.
+
+    Flow:
+      1. NLU: classify intent + extract facts từ text
+      2. Thử match text/facts → option của câu hỏi hiện tại
+         → Nếu match: gọi ds.answer() để advance question (giống /select)
+         → Nếu không match nhưng có facts: add facts vào WM, giữ câu hỏi
+         → Nếu có intent: skip đến group
+         → Fallback: hiển thị clarification message
+    """
+    data = request.get_json(force=True)
+    session_id = data.get("session_id", "")
+    text = data.get("text", "").strip()
+
+    if not session_id or not text:
+        return jsonify({"error": "session_id và text là bắt buộc"}), 400
+
+    ext = _get_ext_session_or_404(session_id)
+    ds = ext.ds
+
+    if ds.is_complete:
+        return _make_diagnosis_response(ext, {})
+
+    # NLU: classify intent + extract facts
+    intent_result = intent_clf.classify(text)
+    nlu_result = fact_extractor.extract_and_classify(text, intent_result)
+    extracted_facts = nlu_result.get("facts", [])
+
+    # ── Bước 1: Thử match text/facts với options của câu hỏi hiện tại ──
+    # Đây là fix cốt lõi: nếu tìm được match → gọi ds.answer() để câu hỏi ADVANCE
+    current_q = ds.get_current_question()
+    matched_value = None
+    if current_q:
+        matched_value = _match_text_to_option(text, current_q, extracted_facts)
+
+    if matched_value:
+        # Tìm được match → xử lý như /select (advance question)
+        result = ds.answer([matched_value])
+        if result.get("session_complete") or ds.is_complete:
+            return _make_diagnosis_response(ext, result)
+        # Thêm confirmed message lên trên
+        confirmed_label = next(
+            (opt["label"] for opt in current_q.get("options", []) if opt["value"] == matched_value),
+            text
+        )
+        return _make_question_response(
+            ext,
+            facts_added=result.get("new_facts", []),
+        )
+
+    # ── Bước 2: Không match option → xử lý NLU thuần ──
+    facts_added = []
+    understood_msg = ""
+    prefix = ""
+
+    if extracted_facts:
+        # Có facts cụ thể → add vào WM và chạy inference (không advance question)
+        new_facts = ds.engine.add_facts(extracted_facts, source="nlu")
+        facts_added = new_facts
+        understood_msg = nlu_result.get("understood_message", "")
+
+        # Chạy forward chaining với facts mới
+        new_diags = ds.engine.run_until_stable()
+        for d in new_diags:
+            formatted = ds.flow._format_diag(d, ds.engine)
+            if formatted not in ds.final_diagnoses:
+                ds.final_diagnoses.append(formatted)
+
+        # Nếu Q01 và intent rõ → skip đến group
+        if nlu_result.get("skip_to_group") and ds.current_question_id == "Q01":
+            skip_qid = nlu_result["skip_to_group"]
+            if skip_qid:
+                ds.current_question_id = skip_qid
+                if intent_result.get("intent"):
+                    ds.current_group = intent_result["intent"]
+                    prefix = UNDERSTOOD_TEMPLATES.get(intent_result["intent"], "")
+
+    elif nlu_result.get("intent") and nlu_result.get("skip_to_group"):
+        # Intent rõ nhưng không có facts cụ thể → skip đến nhóm
+        intent = nlu_result["intent"]
+        skip_qid = nlu_result["skip_to_group"]
+        if skip_qid and ds.current_question_id == "Q01":
+            ds.current_question_id = skip_qid
+            ds.current_group = intent
+            prefix = UNDERSTOOD_TEMPLATES.get(intent, "")
+
+    else:
+        # Không hiểu được gì → gợi ý dùng buttons
+        prefix = "Tôi chưa hiểu rõ. Hãy chọn một trong các lựa chọn bên dưới, hoặc mô tả cụ thể hơn:"
+
+    if ds.is_complete:
+        return _make_diagnosis_response(ext, {"new_facts": facts_added})
+
+    return _make_question_response(ext, prefix=prefix, understood_msg=understood_msg, facts_added=facts_added)
+
+
+@app.route("/select", methods=["POST"])
+def handle_select():
+    """
+    Xử lý khi user click option (single_choice / yes_no).
+    Body: { session_id, question_id, value }
+    """
+    data = request.get_json(force=True)
+    session_id = data.get("session_id", "")
+    question_id = data.get("question_id", "")
+    value = data.get("value", "")
+
+    if not all([session_id, question_id, value]):
+        return jsonify({"error": "session_id, question_id và value là bắt buộc"}), 400
+
+    ext = _get_ext_session_or_404(session_id)
+    ds = ext.ds
+
+    if ds.is_complete:
+        return _make_diagnosis_response(ext, {})
+
+    # Validate question
+    if ds.current_question_id != question_id:
+        return jsonify({
+            "error": f"Question mismatch: expected {ds.current_question_id}, got {question_id}"
+        }), 400
+
+    # Process answer
+    result = ds.answer([value])
+
+    if result.get("session_complete") or ds.is_complete:
+        return _make_diagnosis_response(ext, result)
+
+    return _make_question_response(ext, facts_added=result.get("new_facts", []))
+
+
+@app.route("/submit", methods=["POST"])
+def handle_submit():
+    """
+    Xử lý khi user submit multi_choice (checkbox).
+    Body: { session_id, question_id, values: [list] }
+    """
+    data = request.get_json(force=True)
+    session_id = data.get("session_id", "")
+    question_id = data.get("question_id", "")
+    values = data.get("values", [])
+
+    if not all([session_id, question_id]):
+        return jsonify({"error": "session_id và question_id là bắt buộc"}), 400
+
+    if not isinstance(values, list):
+        return jsonify({"error": "values phải là list"}), 400
+
+    ext = _get_ext_session_or_404(session_id)
+    ds = ext.ds
+
+    if ds.is_complete:
+        return _make_diagnosis_response(ext, {})
+
+    if ds.current_question_id != question_id:
+        return jsonify({
+            "error": f"Question mismatch: expected {ds.current_question_id}, got {question_id}"
+        }), 400
+
+    # Multi-choice: thêm SUBMIT nếu chưa có
+    if "SUBMIT" not in values and values:
+        values = values + ["SUBMIT"]
+
+    result = ds.answer(values)
+
+    if result.get("session_complete") or ds.is_complete:
+        return _make_diagnosis_response(ext, result)
+
+    return _make_question_response(ext, facts_added=result.get("new_facts", []))
+
+
+@app.route("/explanation", methods=["GET"])
+def get_explanation():
+    """
+    Trả full explanation của session.
+    Query param: session_id
+    """
+    session_id = request.args.get("session_id", "")
+    if not session_id:
+        return jsonify({"error": "session_id là bắt buộc"}), 400
+
+    ext = _get_ext_session_or_404(session_id)
+    explanation = build_full_explanation(ext.ds)
+
+    return jsonify(explanation)
+
+
+@app.route("/reset", methods=["POST"])
+def reset_session():
+    """
+    Reset / restart một session.
+    Body: { session_id } — xóa session cũ, tạo mới
+    Response: new session_id + Q01
+    """
+    data = request.get_json(force=True)
+    old_sid = data.get("session_id", "")
+
+    # Xóa session cũ nếu có
+    if old_sid:
+        store.delete(old_sid)
+
+    # Tạo session mới
+    ext = store.create()
+    ds = ext.ds
+    q = ds.get_current_question()
+
+    return jsonify({
+        "session_id": ext.session_id,
+        "session_complete": False,
+        "bot_message": GREETING_MESSAGE,
+        "question": _format_question(q),
+        "input_mode": ds.expected_input_mode,
+        "facts_added": [],
+        "current_group": None,
+        "top_diagnoses": [],
+        "wm_size": 0,
+    })
+
+
+@app.route("/status", methods=["GET"])
+def status():
+    """Health check + KB stats."""
+    if not kb:
+        return jsonify({"status": "degraded", "reason": "KB not loaded"}), 503
+
+    return jsonify({
+        "status": "ok",
+        "kb": kb.stats,
+        "sessions": store.stats() if store else {},
+        "version": "1.0.0",
+    })
+
+
+# ─────────────────────────────────────────────────────────────
+# Error Handlers
+# ─────────────────────────────────────────────────────────────
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": str(e.description)}), 404
+
+
+@app.errorhandler(400)
+def bad_request(e):
+    return jsonify({"error": str(e.description)}), 400
+
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"error": "Lỗi server nội bộ", "detail": str(e)}), 500
+
+
+# ─────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    init_app()
+    print("\n🚀 PC Expert System đang chạy tại http://localhost:5000\n")
+    app.run(host="0.0.0.0", port=5000, debug=True)

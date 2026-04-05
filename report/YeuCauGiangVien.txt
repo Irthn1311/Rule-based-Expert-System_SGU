@@ -1,0 +1,12 @@
+STT	Mã SV	Họ lót	Tên	Nhóm 	Đề tài	Mô tả	Hướng dẫn	Tài liệu tham khảo 1
+1	3123560073	Đỗ Duy	Quý	1	
+2	3123410274	Lư Hồng	Phúc					
+3	3123410387	Nguyễn Hữu	Tri	
+Xây dựng Hệ chuyên gia chẩn đoán lỗi máy tính (Rule-based Expert System)	Mục tiêu: Tạo hệ thống hỏi–đáp để suy luận nguyên nhân lỗi (không lên nguồn, màn hình xanh, Wi-Fi không kết nối…) và gợi ý cách xử lý.	Chọn phạm vi: ví dụ 20–40 tình huống lỗi phổ biến (Windows/PC/Laptop). Thu thập tri thức: từ kỹ thuật viên, tài liệu hãng, diễn đàn; chuẩn hóa thành triệu chứng → nguyên nhân → giải pháp. Mô hình hóa tri thức: viết luật IF–THEN, thiết kế cây suy luận. Suy luận: chọn forward chaining (từ triệu chứng ra kết luận) hoặc backward chaining. Giao diện: web/CLI chatbot hỏi người dùng theo từng bước. Đánh giá: test với bộ ca lỗi, đo độ đúng (accuracy) và thời gian chẩn đoán.	"Wikipedia – Expert system: https://en.wikipedia.org/wiki/Expert_system
+Wikipedia – Forward chaining: https://en.wikipedia.org/wiki/Forward_chaining
+Wikipedia – Backward chaining: https://en.wikipedia.org/wiki/Backward_chaining
+(Nếu dùng Python) Experta (CLIPS-like rules engine): https://github.com/noxdafox/experta"
+				
+
+nhị phân 7 điểm, tam phân 8 điểm, tứ phân 8.5, lục phân 9.
+Còn nhiều nhánh hơn, đẹp hơn, hay hơn thì 10đ
