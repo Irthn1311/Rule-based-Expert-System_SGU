@@ -21,7 +21,7 @@
 | 1 | 3123560073 | Đỗ Duy Quý | 1 |
 | 2 | 3123410274 | Lư Hồng Phúc | 1 |
 | 3 | 3123410387 | Nguyễn Hữu Tri | 1 |
-
+| 4 | 3123410169 | Nguyễn Đăng Khoa | 1 |
 **Đề tài:** Xây dựng Hệ Chuyên Gia Chẩn Đoán Lỗi Máy Tính (Rule-Based Expert System)
 
 ---
@@ -373,6 +373,6 @@ Q05: Tình trạng pin và sạc?
 <div align="center">
 
 **Đại học Sài Gòn — Khoa Công nghệ Thông tin**  
-Năm học 2024–2025
+Năm học 2025–2026
 
 </div>
