@@ -585,6 +585,11 @@ function renderExplanation(data, container) {
   container.innerHTML = html || '<div class="loading-spinner">Không có dữ liệu giải thích.</div>';
 }
 
+function openTree() {
+  if (!state.sessionId) return;
+  window.open(`/tree?session=${state.sessionId}`, '_blank');
+}
+
 function closeExplanationModal() {
   $('explanation-modal').style.display = 'none';
 }

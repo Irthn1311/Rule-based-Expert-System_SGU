@@ -27,6 +27,7 @@ from flask import Flask, request, jsonify, render_template, abort
 from engine.diagnostic_session import KnowledgeBaseLoader
 from engine.question_selector import QuestionSelector
 from engine.explanation_builder import build_short_explanation, build_full_explanation
+from engine.tree_builder import DecisionTreeBuilder
 from nlu.intent_classifier import IntentClassifier
 from nlu.fact_extractor import FactExtractor
 from nlu.patterns import (
@@ -54,11 +55,12 @@ store: SessionStore = None
 question_selector: QuestionSelector = None
 intent_clf: IntentClassifier = None
 fact_extractor: FactExtractor = None
+tree_builder: DecisionTreeBuilder = None
 
 
 def init_app():
     """Khởi tạo Knowledge Base và các services."""
-    global kb, store, question_selector, intent_clf, fact_extractor
+    global kb, store, question_selector, intent_clf, fact_extractor, tree_builder
 
     print("⏳ Loading Knowledge Base...")
     kb = KnowledgeBaseLoader(str(QUESTIONS_PATH), str(RULES_PATH))
@@ -68,6 +70,7 @@ def init_app():
     question_selector = QuestionSelector(kb.questions, kb.diagnoses)
     intent_clf = IntentClassifier()
     fact_extractor = FactExtractor()
+    tree_builder = DecisionTreeBuilder(kb.questions, kb.diagnoses)
     print("✅ All services initialized")
 
 
@@ -518,6 +521,47 @@ def reset_session():
         "top_diagnoses": [],
         "wm_size": 0,
     })
+
+
+# ─────────────────────────────────────────────────────────────
+# Tree Routes
+# ─────────────────────────────────────────────────────────────
+
+@app.route("/tree")
+def tree_page():
+    """Render trang cây suy luận (mở từ diagnosis modal)."""
+    return render_template("tree.html", kb_stats=kb.stats if kb else {})
+
+
+@app.route("/api/tree", methods=["GET"])
+def api_tree():
+    """
+    Trả full DAG tree JSON (cached sau lần đầu).
+    Frontend dùng để render cây.
+    """
+    if not tree_builder:
+        return jsonify({"error": "Tree builder chưa được khởi tạo"}), 503
+    dag = tree_builder.build_dag()
+    return jsonify(dag)
+
+
+@app.route("/api/tree-path", methods=["GET"])
+def api_tree_path():
+    """
+    Trả path của session → {node_ids, edge_keys, primary_group}.
+    Frontend dùng để highlight nhánh đã đi.
+    Query param: session_id
+    """
+    session_id = request.args.get("session_id", "")
+    if not session_id:
+        return jsonify({"node_ids": [], "edge_keys": [], "primary_group": None})
+
+    ext = store.get(session_id)
+    if not ext:
+        return jsonify({"node_ids": [], "edge_keys": [], "primary_group": None})
+
+    path = tree_builder.get_session_path(ext.ds)
+    return jsonify(path)
 
 
 @app.route("/status", methods=["GET"])

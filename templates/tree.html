@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cây Suy Luận — PC Expert</title>
+  <link rel="stylesheet" href="/static/css/tree.css"/>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="tree-loading">
+  <div class="loading-spinner"></div>
+  <p>Đang xây dựng cây suy luận...</p>
+</div>
+
+<!-- Header -->
+<header class="tree-header">
+  <h1>🌳 Cây Suy Luận — PC Expert</h1>
+  <div class="tree-header-stats">
+    <span class="stat-badge">{{ kb_stats.get('questions', 50) }} câu hỏi</span>
+    <span class="stat-badge">{{ kb_stats.get('rules', 103) }} luật</span>
+    <span class="stat-badge">{{ kb_stats.get('diagnoses', 50) }} chẩn đoán</span>
+  </div>
+  <a class="btn-back" href="/" onclick="window.close();return false;">✕ Đóng</a>
+</header>
+
+<!-- Toolbar -->
+<div class="tree-toolbar">
+  <button id="btn-zoom-in"   class="tb-btn">＋ Phóng to</button>
+  <button id="btn-zoom-out"  class="tb-btn">－ Thu nhỏ</button>
+  <span id="zoom-display"    class="zoom-display">55%</span>
+  <div class="tb-sep"></div>
+  <button id="btn-fit-all"   class="tb-btn">⊡ Toàn bộ</button>
+  <button id="btn-fit-path"  class="tb-btn" style="display:none">🎯 Căn theo path</button>
+  <div class="tb-sep"></div>
+  <button id="btn-highlight" class="tb-btn">✨ Highlight path</button>
+  <button id="btn-clear-hl"  class="tb-btn">☐ Xóa highlight</button>
+  <div class="tb-sep"></div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-dot ld-active"></div>
+      <span>Nhánh đã đi</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot ld-dimmed"></div>
+      <span>Không đi qua</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot ld-diag"></div>
+      <span>Chẩn đoán</span>
+    </div>
+  </div>
+
+  <div id="path-info" class="path-info"></div>
+</div>
+
+<!-- Tree Viewport (zoom/pan container) -->
+<div id="tree-viewport">
+  <div id="tree-wrapper">
+    <div id="tree-canvas">
+      <!-- SVG edges (drawn by JS) -->
+      <svg id="tree-svg"></svg>
+      <!-- Node divs (drawn by JS) -->
+      <div id="tree-nodes"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/tree.js"></script>
+</body>
+</html>
