@@ -298,11 +298,11 @@ class DiagnosticSession:
         """Explanation Facility: giải thích toàn bộ quá trình suy luận."""
         reasoning_steps = []
         for step in self.history:
-            q = self.flow.get_question(step["question_id"]) or {}
             reasoning_steps.append({
                 "question_id": step["question_id"],
                 "question": step["question_text"],
-                "answers": step.get("answer_labels", step["answers"])
+                "answers": step.get("answer_labels", step["answers"]),
+                "step": len(reasoning_steps) + 1,
             })
 
         rule_trace = []
@@ -319,6 +319,7 @@ class DiagnosticSession:
         return {
             "question_path": reasoning_steps,
             "working_memory_final": sorted(self.engine.wm.facts),
+            "facts_collected": sorted(self.engine.wm.facts),
             "rules_fired": rule_trace,
             "diagnoses": self.final_diagnoses,
             "top_diagnoses": self.engine.get_top_diagnoses(3),
@@ -330,6 +331,65 @@ class DiagnosticSession:
                 for nf in self.engine.get_near_fire_rules(5)[:5]
             ],
         }
+
+    def to_dict(self) -> dict:
+        """
+        Serialize toàn bộ trạng thái phiên ra JSON-safe dict.
+        Dùng cho stateless mode trên Vercel: client lưu và gửi lại mỗi request.
+        """
+        return {
+            "current_question_id": self.current_question_id,
+            "is_complete": self.is_complete,
+            "expected_input_mode": self.expected_input_mode,
+            "current_group": self.current_group,
+            "asked_question_ids": list(self.asked_question_ids),
+            "history": self.history,
+            "final_diagnoses": self.final_diagnoses,
+            "pending_multi_facts": self.pending_multi_facts,
+            # Engine state
+            "wm_facts": list(self.engine.wm.facts),
+            "diagnosis_cf_map": self.engine._diagnosis_cf_map,
+            "fired_rules_log": self.engine._fired_rules_log,
+            "fired_rule_ids": [
+                log["rule_id"]
+                for log in self.engine._fired_rules_log
+            ],
+            "question_visit_count": self.flow._question_visit_count,
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict,
+        questions_data: list[dict],
+        rules_data: list[dict],
+        diagnoses_data: list[dict],
+    ) -> "DiagnosticSession":
+        """
+        Khôi phục DiagnosticSession từ snapshot (dùng trong stateless mode).
+        KB được truyền vào vì nó là global, không serialize.
+        """
+        ds = cls(questions_data, rules_data, diagnoses_data)
+
+        ds.current_question_id = data.get("current_question_id", cls.ROOT_QUESTION)
+        ds.is_complete = data.get("is_complete", False)
+        ds.expected_input_mode = data.get("expected_input_mode", "single_choice")
+        ds.current_group = data.get("current_group")
+        ds.asked_question_ids = set(data.get("asked_question_ids", []))
+        ds.history = data.get("history", [])
+        ds.final_diagnoses = data.get("final_diagnoses", [])
+        ds.pending_multi_facts = data.get("pending_multi_facts", [])
+        ds.flow._question_visit_count = data.get("question_visit_count", {})
+
+        # Restore engine state
+        ds.engine.restore_state(
+            wm_facts=data.get("wm_facts", []),
+            diagnosis_cf_map=data.get("diagnosis_cf_map", {}),
+            fired_rules_log=data.get("fired_rules_log", []),
+            fired_rule_ids=data.get("fired_rule_ids", []),
+        )
+
+        return ds
 
 
 class KnowledgeBaseLoader:

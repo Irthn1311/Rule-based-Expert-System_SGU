@@ -11,6 +11,11 @@ Routes:
   POST /reset         → Reset / restart session
   GET  /status        → Health check + KB stats
 
+Stateless mode (Vercel-compatible):
+  Mỗi response trả về `session_state` (JSON blob).
+  Mỗi request có thể gửi `session_state` thay vì `session_id`.
+  → Server không cần lưu state giữa các invocations.
+
 Port: 5000 (Flask default)
 """
 
@@ -24,7 +29,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from flask import Flask, request, jsonify, render_template, abort
 
-from engine.diagnostic_session import KnowledgeBaseLoader
+from engine.diagnostic_session import KnowledgeBaseLoader, DiagnosticSession
 from engine.question_selector import QuestionSelector
 from engine.explanation_builder import build_short_explanation, build_full_explanation
 from engine.tree_builder import DecisionTreeBuilder
@@ -49,18 +54,22 @@ DATA_DIR = PROJECT_ROOT / "data"
 QUESTIONS_PATH = DATA_DIR / "06_questions.json"
 RULES_PATH = DATA_DIR / "07_rules_and_diagnoses.json"
 
-# Global singletons (init khi startup)
+# Global singletons — lazy init (tránh double-init và Vercel cold start issues)
 kb: KnowledgeBaseLoader = None
 store: SessionStore = None
 question_selector: QuestionSelector = None
 intent_clf: IntentClassifier = None
 fact_extractor: FactExtractor = None
 tree_builder: DecisionTreeBuilder = None
+_initialized = False
 
 
 def init_app():
     """Khởi tạo Knowledge Base và các services."""
-    global kb, store, question_selector, intent_clf, fact_extractor, tree_builder
+    global kb, store, question_selector, intent_clf, fact_extractor, tree_builder, _initialized
+
+    if _initialized:
+        return
 
     print("⏳ Loading Knowledge Base...")
     kb = KnowledgeBaseLoader(str(QUESTIONS_PATH), str(RULES_PATH))
@@ -71,7 +80,54 @@ def init_app():
     intent_clf = IntentClassifier()
     fact_extractor = FactExtractor()
     tree_builder = DecisionTreeBuilder(kb.questions, kb.diagnoses)
+    _initialized = True
     print("✅ All services initialized")
+
+
+@app.before_request
+def ensure_initialized():
+    """Lazy init — an toàn với Vercel cold starts và Flask debug reloader."""
+    init_app()
+
+
+# ─────────────────────────────────────────────────────────────
+# Session Resolution — Stateless + Stateful hybrid
+# ─────────────────────────────────────────────────────────────
+
+def _resolve_session(data: dict):
+    """
+    Lấy DiagnosticSession từ request data.
+
+    Ưu tiên:
+    1. session_state (blob JSON từ client) → stateless mode, hoạt động trên Vercel
+    2. session_id → stateful in-memory store (hoạt động khi server là persistent process)
+
+    Return: (ds: DiagnosticSession, session_id: str) hoặc abort(404)
+    """
+    session_state = data.get("session_state")
+    if session_state and isinstance(session_state, dict):
+        # Stateless mode: restore từ blob client gửi lên
+        try:
+            ds = DiagnosticSession.from_dict(
+                session_state,
+                kb.questions,
+                kb.rules,
+                kb.diagnoses,
+            )
+            # Dùng session_id từ blob làm identifier (chỉ để response)
+            session_id = session_state.get("_session_id", "stateless")
+            return ds, session_id
+        except Exception as e:
+            abort(400, description=f"session_state không hợp lệ: {e}")
+
+    # Fallback: stateful in-memory store
+    session_id = data.get("session_id", "")
+    if not session_id:
+        abort(400, description="session_id hoặc session_state là bắt buộc")
+    ext = store.get(session_id)
+    if not ext:
+        abort(404, description="Phiên chẩn đoán không tồn tại hoặc đã hết hạn.")
+    return ext.ds, session_id
 
 
 # ─────────────────────────────────────────────────────────────
@@ -157,7 +213,6 @@ def _match_text_to_option(text: str, question: dict, extracted_facts: list[str])
         # Chiến lược 2: label match
         label = opt.get("label", "").lower()
         if label and len(label) > 1:
-            # Tách các từ chốt trong label và kiểm tra xuất hiện trong text
             label_words = [w for w in label.split() if len(w) > 2]
             hits = sum(1 for w in label_words if w in text_lower)
             if hits > 0:
@@ -175,12 +230,11 @@ def _match_text_to_option(text: str, question: dict, extracted_facts: list[str])
     return best_match if best_score >= 2 else None
 
 
-def _make_question_response(ext, prefix="", understood_msg="", facts_added=None):
+def _make_question_response(ds: DiagnosticSession, session_id: str, prefix="", understood_msg="", facts_added=None):
     """
     Tạo response chuẩn khi gửi câu hỏi tiếp theo.
-    Bao gồm short_explanation từ dynamic questioning.
+    Luôn bao gồm session_state để client có thể dùng stateless mode.
     """
-    ds = ext.ds
     q = ds.get_current_question()
 
     # Dynamic questioning: lấy near-fire rules để tính explanation
@@ -197,8 +251,12 @@ def _make_question_response(ext, prefix="", understood_msg="", facts_added=None)
         short_explanation=short_exp,
     )
 
+    # Serialize state để client giữ lại (stateless Vercel support)
+    state_snapshot = ds.to_dict()
+    state_snapshot["_session_id"] = session_id
+
     return jsonify({
-        "session_id": ext.session_id,
+        "session_id": session_id,
         "session_complete": ds.is_complete,
         "bot_message": bot_msg,
         "question": _format_question(q) if q else None,
@@ -207,12 +265,12 @@ def _make_question_response(ext, prefix="", understood_msg="", facts_added=None)
         "current_group": ds.current_group,
         "top_diagnoses": ds.engine.get_top_diagnoses(3),
         "wm_size": len(ds.engine.wm.facts),
+        "session_state": state_snapshot,  # ← stateless Vercel support
     })
 
 
-def _make_diagnosis_response(ext, result: dict):
+def _make_diagnosis_response(ds: DiagnosticSession, session_id: str, result: dict):
     """Tạo response khi session hoàn tất → hiển thị diagnosis card."""
-    ds = ext.ds
     top = ds.engine.get_top_diagnoses(3)
 
     # Primary diagnosis
@@ -220,8 +278,11 @@ def _make_diagnosis_response(ext, result: dict):
     if not primary and ds.final_diagnoses:
         primary = ds.final_diagnoses[0]
 
+    state_snapshot = ds.to_dict()
+    state_snapshot["_session_id"] = session_id
+
     return jsonify({
-        "session_id": ext.session_id,
+        "session_id": session_id,
         "session_complete": True,
         "bot_message": _build_completion_message(primary),
         "question": None,
@@ -231,6 +292,7 @@ def _make_diagnosis_response(ext, result: dict):
         "facts_added": result.get("new_facts", []),
         "current_group": ds.current_group,
         "wm_size": len(ds.engine.wm.facts),
+        "session_state": state_snapshot,  # ← stateless Vercel support
     })
 
 
@@ -280,13 +342,16 @@ def index():
 def start_session():
     """
     Tạo phiên chẩn đoán mới.
-    Response: session_id + câu hỏi đầu tiên (Q01)
+    Response: session_id + câu hỏi đầu tiên (Q01) + session_state
     """
     ext = store.create()
     ds = ext.ds
 
     q = ds.get_current_question()
     bot_msg = GREETING_MESSAGE
+
+    state_snapshot = ds.to_dict()
+    state_snapshot["_session_id"] = ext.session_id
 
     return jsonify({
         "session_id": ext.session_id,
@@ -298,6 +363,7 @@ def start_session():
         "current_group": None,
         "top_diagnoses": [],
         "wm_size": 0,
+        "session_state": state_snapshot,  # ← client sẽ lưu và gửi lại
     })
 
 
@@ -315,17 +381,15 @@ def handle_message():
          → Fallback: hiển thị clarification message
     """
     data = request.get_json(force=True)
-    session_id = data.get("session_id", "")
     text = data.get("text", "").strip()
 
-    if not session_id or not text:
-        return jsonify({"error": "session_id và text là bắt buộc"}), 400
+    if not text:
+        return jsonify({"error": "text là bắt buộc"}), 400
 
-    ext = _get_ext_session_or_404(session_id)
-    ds = ext.ds
+    ds, session_id = _resolve_session(data)
 
     if ds.is_complete:
-        return _make_diagnosis_response(ext, {})
+        return _make_diagnosis_response(ds, session_id, {})
 
     # NLU: classify intent + extract facts
     intent_result = intent_clf.classify(text)
@@ -333,7 +397,6 @@ def handle_message():
     extracted_facts = nlu_result.get("facts", [])
 
     # ── Bước 1: Thử match text/facts với options của câu hỏi hiện tại ──
-    # Đây là fix cốt lõi: nếu tìm được match → gọi ds.answer() để câu hỏi ADVANCE
     current_q = ds.get_current_question()
     matched_value = None
     if current_q:
@@ -343,14 +406,9 @@ def handle_message():
         # Tìm được match → xử lý như /select (advance question)
         result = ds.answer([matched_value])
         if result.get("session_complete") or ds.is_complete:
-            return _make_diagnosis_response(ext, result)
-        # Thêm confirmed message lên trên
-        confirmed_label = next(
-            (opt["label"] for opt in current_q.get("options", []) if opt["value"] == matched_value),
-            text
-        )
+            return _make_diagnosis_response(ds, session_id, result)
         return _make_question_response(
-            ext,
+            ds, session_id,
             facts_added=result.get("new_facts", []),
         )
 
@@ -360,19 +418,16 @@ def handle_message():
     prefix = ""
 
     if extracted_facts:
-        # Có facts cụ thể → add vào WM và chạy inference (không advance question)
         new_facts = ds.engine.add_facts(extracted_facts, source="nlu")
         facts_added = new_facts
         understood_msg = nlu_result.get("understood_message", "")
 
-        # Chạy forward chaining với facts mới
         new_diags = ds.engine.run_until_stable()
         for d in new_diags:
             formatted = ds.flow._format_diag(d, ds.engine)
             if formatted not in ds.final_diagnoses:
                 ds.final_diagnoses.append(formatted)
 
-        # Nếu Q01 và intent rõ → skip đến group
         if nlu_result.get("skip_to_group") and ds.current_question_id == "Q01":
             skip_qid = nlu_result["skip_to_group"]
             if skip_qid:
@@ -382,7 +437,6 @@ def handle_message():
                     prefix = UNDERSTOOD_TEMPLATES.get(intent_result["intent"], "")
 
     elif nlu_result.get("intent") and nlu_result.get("skip_to_group"):
-        # Intent rõ nhưng không có facts cụ thể → skip đến nhóm
         intent = nlu_result["intent"]
         skip_qid = nlu_result["skip_to_group"]
         if skip_qid and ds.current_question_id == "Q01":
@@ -391,77 +445,76 @@ def handle_message():
             prefix = UNDERSTOOD_TEMPLATES.get(intent, "")
 
     else:
-        # Không hiểu được gì → gợi ý dùng buttons
         prefix = "Tôi chưa hiểu rõ. Hãy chọn một trong các lựa chọn bên dưới, hoặc mô tả cụ thể hơn:"
 
     if ds.is_complete:
-        return _make_diagnosis_response(ext, {"new_facts": facts_added})
+        return _make_diagnosis_response(ds, session_id, {"new_facts": facts_added})
 
-    return _make_question_response(ext, prefix=prefix, understood_msg=understood_msg, facts_added=facts_added)
+    return _make_question_response(ds, session_id, prefix=prefix, understood_msg=understood_msg, facts_added=facts_added)
 
 
 @app.route("/select", methods=["POST"])
 def handle_select():
     """
     Xử lý khi user click option (single_choice / yes_no).
-    Body: { session_id, question_id, value }
+    Body: { session_id | session_state, question_id, value }
     """
     data = request.get_json(force=True)
-    session_id = data.get("session_id", "")
     question_id = data.get("question_id", "")
     value = data.get("value", "")
 
-    if not all([session_id, question_id, value]):
-        return jsonify({"error": "session_id, question_id và value là bắt buộc"}), 400
+    if not all([question_id, value]):
+        return jsonify({"error": "question_id và value là bắt buộc"}), 400
 
-    ext = _get_ext_session_or_404(session_id)
-    ds = ext.ds
+    ds, session_id = _resolve_session(data)
 
     if ds.is_complete:
-        return _make_diagnosis_response(ext, {})
+        return _make_diagnosis_response(ds, session_id, {})
 
-    # Validate question
+    # Fix Bug #3: Nếu question đã lỗi thời (stale click sau NLU skip)
+    # → trả lại câu hỏi hiện tại thay vì 400 cứng
     if ds.current_question_id != question_id:
-        return jsonify({
-            "error": f"Question mismatch: expected {ds.current_question_id}, got {question_id}"
-        }), 400
+        return _make_question_response(
+            ds, session_id,
+            prefix="⚠️ Câu hỏi đó đã qua. Đây là câu hỏi hiện tại:",
+        )
 
     # Process answer
     result = ds.answer([value])
 
     if result.get("session_complete") or ds.is_complete:
-        return _make_diagnosis_response(ext, result)
+        return _make_diagnosis_response(ds, session_id, result)
 
-    return _make_question_response(ext, facts_added=result.get("new_facts", []))
+    return _make_question_response(ds, session_id, facts_added=result.get("new_facts", []))
 
 
 @app.route("/submit", methods=["POST"])
 def handle_submit():
     """
     Xử lý khi user submit multi_choice (checkbox).
-    Body: { session_id, question_id, values: [list] }
+    Body: { session_id | session_state, question_id, values: [list] }
     """
     data = request.get_json(force=True)
-    session_id = data.get("session_id", "")
     question_id = data.get("question_id", "")
     values = data.get("values", [])
 
-    if not all([session_id, question_id]):
-        return jsonify({"error": "session_id và question_id là bắt buộc"}), 400
+    if not question_id:
+        return jsonify({"error": "question_id là bắt buộc"}), 400
 
     if not isinstance(values, list):
         return jsonify({"error": "values phải là list"}), 400
 
-    ext = _get_ext_session_or_404(session_id)
-    ds = ext.ds
+    ds, session_id = _resolve_session(data)
 
     if ds.is_complete:
-        return _make_diagnosis_response(ext, {})
+        return _make_diagnosis_response(ds, session_id, {})
 
+    # Fix: soft-match cho stale multi-choice submit
     if ds.current_question_id != question_id:
-        return jsonify({
-            "error": f"Question mismatch: expected {ds.current_question_id}, got {question_id}"
-        }), 400
+        return _make_question_response(
+            ds, session_id,
+            prefix="⚠️ Câu hỏi đó đã qua. Đây là câu hỏi hiện tại:",
+        )
 
     # Multi-choice: thêm SUBMIT nếu chưa có
     if "SUBMIT" not in values and values:
@@ -470,9 +523,9 @@ def handle_submit():
     result = ds.answer(values)
 
     if result.get("session_complete") or ds.is_complete:
-        return _make_diagnosis_response(ext, result)
+        return _make_diagnosis_response(ds, session_id, result)
 
-    return _make_question_response(ext, facts_added=result.get("new_facts", []))
+    return _make_question_response(ds, session_id, facts_added=result.get("new_facts", []))
 
 
 @app.route("/explanation", methods=["GET"])
@@ -480,6 +533,7 @@ def get_explanation():
     """
     Trả full explanation của session.
     Query param: session_id
+    Hoặc POST với session_state (stateless mode)
     """
     session_id = request.args.get("session_id", "")
     if not session_id:
@@ -496,12 +550,12 @@ def reset_session():
     """
     Reset / restart một session.
     Body: { session_id } — xóa session cũ, tạo mới
-    Response: new session_id + Q01
+    Response: new session_id + Q01 + session_state
     """
     data = request.get_json(force=True)
     old_sid = data.get("session_id", "")
 
-    # Xóa session cũ nếu có
+    # Xóa session cũ nếu có (không lỗi nếu không tìm thấy)
     if old_sid:
         store.delete(old_sid)
 
@@ -509,6 +563,9 @@ def reset_session():
     ext = store.create()
     ds = ext.ds
     q = ds.get_current_question()
+
+    state_snapshot = ds.to_dict()
+    state_snapshot["_session_id"] = ext.session_id
 
     return jsonify({
         "session_id": ext.session_id,
@@ -520,6 +577,7 @@ def reset_session():
         "current_group": None,
         "top_diagnoses": [],
         "wm_size": 0,
+        "session_state": state_snapshot,
     })
 
 
@@ -600,7 +658,6 @@ def server_error(e):
 # ─────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────
-init_app()
 
 if __name__ == "__main__":
     init_app()

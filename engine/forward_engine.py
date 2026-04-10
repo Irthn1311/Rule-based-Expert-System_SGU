@@ -140,6 +140,32 @@ class ForwardChainingEngine:
         """Trace của tất cả rules đã fire — dùng cho Explanation Facility."""
         return list(self._fired_rules_log)
 
+    def restore_state(
+        self,
+        wm_facts: list[str],
+        diagnosis_cf_map: dict[str, float],
+        fired_rules_log: list[dict],
+        fired_rule_ids: list[str],
+    ) -> None:
+        """
+        Khôi phục trạng thái engine từ snapshot (dùng cho stateless mode trên Vercel).
+        Phải gọi sau __init__, trước khi xử lý request.
+        """
+        # Restore WM facts
+        for fact in wm_facts:
+            if fact not in self.wm._facts:
+                self.wm._facts.add(fact)
+                self.wm._fact_history.append((fact, "restored"))
+        # Restore diagnosis CF map
+        self._diagnosis_cf_map = dict(diagnosis_cf_map)
+        # Restore fired rules log
+        self._fired_rules_log = list(fired_rules_log)
+        # Mark rules that already fired so they don't re-fire
+        fired_ids_set = set(fired_rule_ids)
+        for rule in self.rules:
+            if rule.id in fired_ids_set:
+                rule.fired = True
+
     def get_diagnosis_details(self, diag_id: str) -> Optional[dict]:
         return self.diagnoses_db.get(diag_id)
 

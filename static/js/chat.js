@@ -17,6 +17,7 @@
 // ── State ──────────────────────────────────────────────────────
 const state = {
   sessionId: null,
+  sessionState: null,    // ← stateless Vercel support: blob gửi kèm mỗi request
   currentQuestion: null,
   inputMode: 'single_choice',  // text | single_choice | multi_choice
   isWaiting: false,
@@ -73,14 +74,15 @@ async function restartSession() {
   const oldId = state.sessionId;
   closeDiagnosisModal();
   setWaiting(true);
-  clearChat();
+  // Fix Bug #5: KHÔNG clearChat() trước — chỉ show typing indicator
+  // clearChat sẽ được gọi SAU KHI nhận response thành công
   showTyping();
 
   try {
     const res = await fetchJSON('/reset', 'POST', { session_id: oldId || '' });
+    clearChat();       // ← Clear sau khi thành công, không phải trước
     hideTyping();
     applyResponse(res);
-    // Reset side panel
     updateSidePanel([], []);
   } catch (err) {
     hideTyping();
@@ -98,12 +100,18 @@ async function sendMessage() {
 
   addUserMessage(text);
   textInput.value = '';
+
+  // Fix Bug #3: disable stale buttons NGAY LẬP TỨC trước khi /message quay về
+  // Tránh user click button cũ trong lúc server đang xử lý NLU skip
+  disableQuickReplies();
+
   setWaiting(true);
   showTyping();
 
   try {
     const res = await fetchJSON('/message', 'POST', {
       session_id: state.sessionId,
+      session_state: state.sessionState,  // ← stateless support
       text,
     });
     hideTyping();
@@ -111,6 +119,7 @@ async function sendMessage() {
   } catch (err) {
     hideTyping();
     addBotMessage('❌ Lỗi khi gửi tin nhắn. Vui lòng thử lại.');
+    enableQuickReplies(); // khôi phục nếu lỗi
   } finally {
     setWaiting(false);
   }
@@ -129,6 +138,7 @@ async function sendSelect(questionId, value, label) {
   try {
     const res = await fetchJSON('/select', 'POST', {
       session_id: state.sessionId,
+      session_state: state.sessionState,  // ← stateless support
       question_id: questionId,
       value,
     });
@@ -161,6 +171,7 @@ async function submitMultiChoice() {
   try {
     const res = await fetchJSON('/submit', 'POST', {
       session_id: state.sessionId,
+      session_state: state.sessionState,  // ← stateless support
       question_id: state.currentQuestion.id,
       values,
     });
@@ -182,8 +193,21 @@ function applyResponse(res) {
 
   // Update session state
   if (res.session_id) state.sessionId = res.session_id;
-  if (res.input_mode) state.inputMode = res.input_mode;
-  if (res.question)   state.currentQuestion = res.question;
+  if (res.input_mode !== undefined) state.inputMode = res.input_mode;
+
+  // Fix Bug #4: luôn update currentQuestion kể cả khi null
+  if ('question' in res) {
+    state.currentQuestion = res.question || null;
+  }
+  // Explicit clear khi session hoàn tất
+  if (res.session_complete) {
+    state.currentQuestion = null;
+  }
+
+  // Stateless mode: lưu session_state để gửi lại lần sau
+  if (res.session_state) {
+    state.sessionState = res.session_state;
+  }
 
   // Update side panel
   if (Array.isArray(res.top_diagnoses)) {
@@ -613,7 +637,9 @@ function clearChat() {
   rulesSection.style.display = 'none';
   wmCount.textContent = '0';
 
+  // Fix Bug #5: reset session state (bao gồm sessionState blob)
   state.sessionId = null;
+  state.sessionState = null;   // ← thêm dòng này
   state.currentQuestion = null;
   state.isWaiting = false;
   state.lastDiagnoses = [];
