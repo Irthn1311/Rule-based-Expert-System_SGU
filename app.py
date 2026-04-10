@@ -606,5 +606,3 @@ if __name__ == "__main__":
     init_app()
     print("\n🚀 PC Expert System đang chạy tại http://localhost:5000\n")
     app.run(host="0.0.0.0", port=5000, debug=True)
-
-# hehe
