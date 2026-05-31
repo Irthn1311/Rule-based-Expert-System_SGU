@@ -585,25 +585,38 @@ def handle_instagram_api_message(sender_id, text) -> str:
     return _format_payload_for_messenger(payload)
 
 
-def send_instagram_api_message(recipient_id, text) -> bool:
-    """
-    Placeholder gửi message Instagram API.
-    Hiện ưu tiên verify webhook + nhận/log payload trước khi chốt endpoint gửi.
-    """
+def send_instagram_api_message(recipient_id: str, text: str) -> bool:
+    """Gửi tin nhắn thật qua Instagram API new flow."""
     token = os.getenv("INSTAGRAM_ACCESS_TOKEN", "").strip()
     version = os.getenv("INSTAGRAM_API_VERSION", "v25.0").strip() or "v25.0"
-    account_id = os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID", "").strip()
 
-    if not token or not account_id:
-        print("[IG API] Missing INSTAGRAM_ACCESS_TOKEN or INSTAGRAM_BUSINESS_ACCOUNT_ID")
-        print(f"[IG API] Reply placeholder recipient_id={recipient_id}: {text}")
+    if not token:
+        print("[IG API] Missing INSTAGRAM_ACCESS_TOKEN")
         return False
 
-    print(
-        "[IG API] Send placeholder "
-        f"version={version}, business_account_id={account_id}, recipient_id={recipient_id}: {text}"
-    )
-    return False
+    if requests is None:
+        print("[IG API] Missing requests dependency. Run: pip install -r requirements.txt")
+        return False
+
+    url = f"https://graph.instagram.com/{version}/me/messages"
+    payload = {
+        "recipient": {"id": str(recipient_id)},
+        "message": {"text": text},
+    }
+
+    print(f"[IG API] Send endpoint={url}, recipient_id={recipient_id}")
+    try:
+        resp = requests.post(
+            url,
+            params={"access_token": token},
+            json=payload,
+            timeout=10,
+        )
+        print(f"[IG API] Send status_code={resp.status_code}, response={resp.text}")
+        return resp.ok
+    except requests.RequestException as exc:
+        print(f"[IG API] Send error: {exc}")
+        return False
 
 
 def _as_list(value) -> list:
@@ -625,6 +638,20 @@ def _extract_text_value(value) -> str | None:
     return None
 
 
+def _should_skip_instagram_api_message(sender_id, message) -> bool:
+    """Bỏ qua echo/self message để tránh bot tự gọi lại chính mình."""
+    if isinstance(message, dict) and message.get("is_echo"):
+        print("[IG API] Skip echo message")
+        return True
+
+    business_account_id = os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID", "").strip()
+    if business_account_id and str(sender_id) == business_account_id:
+        print(f"[IG API] Skip self message sender_id={sender_id}")
+        return True
+
+    return False
+
+
 def _extract_instagram_api_messages(payload) -> list[tuple[str, str]]:
     """
     Parse mềm các cấu trúc webhook Instagram phổ biến.
@@ -639,6 +666,9 @@ def _extract_instagram_api_messages(payload) -> list[tuple[str, str]]:
             sender = event.get("sender") if isinstance(event, dict) else {}
             message = event.get("message") if isinstance(event, dict) else {}
             sender_id = sender.get("id") if isinstance(sender, dict) else None
+            if sender_id and _should_skip_instagram_api_message(sender_id, message):
+                continue
+
             text = _extract_text_value(message)
             if sender_id and text:
                 parsed.append((str(sender_id), text))
@@ -657,6 +687,9 @@ def _extract_instagram_api_messages(payload) -> list[tuple[str, str]]:
                     or message.get("sender_id")
                     or (sender.get("id") if isinstance(sender, dict) else None)
                 )
+                if sender_id and _should_skip_instagram_api_message(sender_id, message):
+                    continue
+
                 text = _extract_text_value(message.get("text") if isinstance(message, dict) else None)
                 if not text:
                     text = _extract_text_value(message)
@@ -668,6 +701,10 @@ def _extract_instagram_api_messages(payload) -> list[tuple[str, str]]:
                 value.get("sender_id")
                 or (sender.get("id") if isinstance(sender, dict) else None)
             )
+            value_message = value.get("message") if isinstance(value.get("message"), dict) else value
+            if sender_id and _should_skip_instagram_api_message(sender_id, value_message):
+                continue
+
             text = _extract_text_value(value.get("message")) or _extract_text_value(value.get("text"))
             if sender_id and text:
                 parsed.append((str(sender_id), text))

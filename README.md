@@ -336,10 +336,18 @@ Verify Token:
 tri_test_verify_2026
 ```
 
-Giai đoạn hiện tại ưu tiên verify webhook và log payload thật. `POST /webhook/instagram` sẽ log raw body với prefix `[IG API]`, thử parse `sender_id` và `text` từ `entry[].messaging[]` hoặc `entry[].changes[]`, đưa message vào chatbot rule-based, rồi log reply ra terminal. Hàm gửi Instagram thật đang là placeholder và sẽ log rõ nếu thiếu:
+`POST /webhook/instagram` sẽ log raw body với prefix `[IG API]`, thử parse `sender_id` và `text` từ `entry[].messaging[]` hoặc `entry[].changes[]`, rồi đưa message vào chatbot rule-based. Webhook sẽ bỏ qua echo/self message nếu payload có `message.is_echo` hoặc `sender_id` trùng `INSTAGRAM_BUSINESS_ACCOUNT_ID`.
+
+Instagram Send API dùng endpoint:
 
 ```text
-[IG API] Missing INSTAGRAM_ACCESS_TOKEN or INSTAGRAM_BUSINESS_ACCOUNT_ID
+POST https://graph.instagram.com/v25.0/me/messages
+```
+
+Access token được truyền qua query param `access_token=INSTAGRAM_ACCESS_TOKEN`. Nếu thiếu token, server sẽ log:
+
+```text
+[IG API] Missing INSTAGRAM_ACCESS_TOKEN
 ```
 
 ### Test bằng Fanpage
