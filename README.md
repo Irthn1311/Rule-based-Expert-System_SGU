@@ -236,6 +236,145 @@ python -m pytest tests/test_flow.py -v    # Flask route tests
 
 ---
 
+## Facebook Messenger Webhook Demo
+
+Tính năng này cho phép cấu hình Meta Webhook để người dùng nhắn Facebook Fanpage và bot Flask trả lời lại qua Messenger Send API. Không commit token thật vào source code; chỉ cấu hình bằng biến môi trường khi chạy demo.
+
+### Biến môi trường cần có
+
+- `VERIFY_TOKEN`: chuỗi dùng để verify webhook trên Meta, ví dụ demo: `tri_test_verify_2026`
+- `PAGE_ACCESS_TOKEN`: Page Access Token lấy trong Meta Developer Console
+- `META_GRAPH_VERSION`: tùy chọn, mặc định `v20.0`
+- `INSTAGRAM_ACCESS_TOKEN`: token dùng cho Instagram API khi bật gửi thật
+- `INSTAGRAM_API_VERSION`: tùy chọn, mặc định `v25.0`
+- `INSTAGRAM_BUSINESS_ACCOUNT_ID`: Instagram Business Account ID
+
+### Set env trên Windows CMD
+
+```bat
+set VERIFY_TOKEN=tri_test_verify_2026
+set PAGE_ACCESS_TOKEN=<PAGE_ACCESS_TOKEN_CUA_BAN>
+set META_GRAPH_VERSION=v20.0
+set INSTAGRAM_ACCESS_TOKEN=<INSTAGRAM_ACCESS_TOKEN_CUA_BAN>
+set INSTAGRAM_API_VERSION=v25.0
+set INSTAGRAM_BUSINESS_ACCOUNT_ID=<INSTAGRAM_BUSINESS_ACCOUNT_ID_CUA_BAN>
+python app.py
+```
+
+### Set env trên PowerShell
+
+```powershell
+$env:VERIFY_TOKEN="tri_test_verify_2026"
+$env:PAGE_ACCESS_TOKEN="<PAGE_ACCESS_TOKEN_CUA_BAN>"
+$env:META_GRAPH_VERSION="v20.0"
+$env:INSTAGRAM_ACCESS_TOKEN="<INSTAGRAM_ACCESS_TOKEN_CUA_BAN>"
+$env:INSTAGRAM_API_VERSION="v25.0"
+$env:INSTAGRAM_BUSINESS_ACCOUNT_ID="<INSTAGRAM_BUSINESS_ACCOUNT_ID_CUA_BAN>"
+python app.py
+```
+
+### Chạy ngrok
+
+Mở terminal khác và chạy:
+
+```bash
+ngrok http 5000
+```
+
+Lấy URL HTTPS mà ngrok cấp, ví dụ `https://abc-123.ngrok-free.app`.
+
+### Cấu hình Facebook Messenger
+
+Facebook Messenger integration hiện tại dùng route riêng:
+
+```text
+/webhook/meta
+```
+
+### Meta App URLs
+
+Khi Meta Developer App yêu cầu các URL pháp lý, dùng các đường dẫn sau qua ngrok:
+
+```text
+Privacy Policy URL = https://<ngrok-url>/privacy
+Terms of Service URL = https://<ngrok-url>/terms
+Data Deletion URL = https://<ngrok-url>/data-deletion
+```
+
+Trong Meta Developer Console của app gắn với Fanpage:
+
+```text
+Callback URL = https://<ngrok-url>/webhook/meta
+Verify Token = tri_test_verify_2026
+```
+
+Webhook verify sẽ gọi:
+
+```text
+GET /webhook/meta?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...
+```
+
+Nếu token đúng, Flask trả lại `hub.challenge`. Sau đó subscribe webhook field `messages` cho Page.
+
+### Cấu hình Instagram API new flow
+
+Instagram API flow mới dùng route riêng:
+
+```text
+/webhook/instagram
+```
+
+Callback URL:
+
+```text
+https://<ngrok-url>/webhook/instagram
+```
+
+Verify Token:
+
+```text
+tri_test_verify_2026
+```
+
+Giai đoạn hiện tại ưu tiên verify webhook và log payload thật. `POST /webhook/instagram` sẽ log raw body với prefix `[IG API]`, thử parse `sender_id` và `text` từ `entry[].messaging[]` hoặc `entry[].changes[]`, đưa message vào chatbot rule-based, rồi log reply ra terminal. Hàm gửi Instagram thật đang là placeholder và sẽ log rõ nếu thiếu:
+
+```text
+[IG API] Missing INSTAGRAM_ACCESS_TOKEN or INSTAGRAM_BUSINESS_ACCOUNT_ID
+```
+
+### Test bằng Fanpage
+
+1. Chạy Flask bằng `python app.py`.
+2. Chạy `ngrok http 5000`.
+3. Cấu hình Callback URL và Verify Token trên Meta như trên.
+4. Nhắn vào Fanpage:
+
+```text
+hello
+```
+
+Bot sẽ phản hồi và hiển thị câu hỏi chẩn đoán đầu tiên. Tiếp tục nhắn:
+
+```text
+laptop không lên nguồn
+```
+
+Bot sẽ cố gắng đưa nội dung này vào flow chẩn đoán rule-based hiện có. Khi muốn làm lại phiên Messenger, nhắn:
+
+```text
+reset
+```
+
+hoặc:
+
+```text
+bắt đầu lại
+```
+
+Server sẽ log các bước quan trọng: verify webhook, nhận message từ Meta, tạo session theo `sender.id`, gửi reply và response từ Meta Send API.
+
+---
+
 ## 🎯 Tính năng nổi bật
 
 ### 1. Dynamic Questioning (Câu hỏi thông minh)

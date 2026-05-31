@@ -47,6 +47,12 @@ class TestRoutes:
         assert data['kb']['questions'] == 50
         assert data['kb']['rules'] == 103
 
+    @pytest.mark.parametrize('path', ['/privacy', '/terms', '/data-deletion'])
+    def test_static_policy_routes_return_200(self, client, path):
+        res = client.get(path)
+        assert res.status_code == 200
+        assert 'text/html' in res.content_type
+
     def test_start_returns_session(self, client):
         res = client.post('/start', json={})
         data = res.get_json()
