@@ -1,525 +1,152 @@
-<div align="center">
+# Rule-Based Computer Troubleshooting Expert System
 
-# 🖥️ Hệ Chuyên Gia Chẩn Đoán Lỗi Máy Tính
+A web-based expert system that diagnoses common computer problems using **forward chaining**, certainty factors, dynamic questioning, and an explanation layer.
 
-### Rule-Based Expert System — Web Chat Interface
+## Overview
 
-**Môn học:** Công nghệ Tri Thức &nbsp;|&nbsp; **Trường:** Đại học Sài Gòn (SGU)
+Instead of returning a black-box prediction, the system keeps an explicit working memory of facts, fires interpretable IF–THEN rules, asks follow-up questions when evidence is missing, and explains how a diagnosis was reached.
 
-[![Python](https://img.shields.io/badge/Python-3.13-blue?logo=python)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-3.0-black?logo=flask)](https://flask.palletsprojects.com)
-[![License](https://img.shields.io/badge/License-Academic-green)]()
+### Knowledge base
 
-</div>
+| Component | Current size |
+| --- | ---: |
+| Questions | 50 |
+| IF–THEN rules | 103 |
+| Diagnoses | 50 |
+| Symptom facts | ~166 |
+| Diagnostic groups | 8 |
 
----
+The knowledge base covers power/boot, display, Windows/OS, networking, audio/camera, peripherals, performance/thermal issues, and storage.
 
-## 👥 Thông tin nhóm
+## Inference pipeline
 
-| STT | MSSV | Họ và Tên | Nhóm |
-|-----|------|-----------|------|
-| 1 | 3123560073 | Đỗ Duy Quý | 1 |
-| 2 | 3123410274 | Lư Hồng Phúc | 1 |
-| 3 | 3123410387 | Nguyễn Hữu Tri | 1 |
-| 4 | 3123410169 | Nguyễn Đăng Khoa | 1 |
-**Đề tài:** Xây dựng Hệ Chuyên Gia Chẩn Đoán Lỗi Máy Tính (Rule-Based Expert System)
-
----
-
-## 📋 Mục tiêu đề tài
-
-Xây dựng hệ thống web dạng **chat** cho phép người dùng mô tả lỗi máy tính, từ đó hệ thống:
-
-- 🔎 **Suy luận** nguyên nhân lỗi bằng luật **IF–THEN** (Forward Chaining)
-- ❓ **Hỏi thêm** câu hỏi thông minh theo từng bước (Dynamic Questioning)
-- ✅ **Đưa ra chẩn đoán** kèm hướng xử lý cụ thể
-- 📋 **Giải thích** toàn bộ quá trình suy luận (Explainable AI)
-
----
-
-## 📊 Quy mô Knowledge Base
-
-> Yêu cầu giảng viên: "20–40 tình huống phổ biến" → **Nhóm đã vượt xa yêu cầu:**
-
-| Thành phần | Số lượng | Ghi chú |
-|---|---|---|
-| **Câu hỏi** | **50** | Phân nhánh động, có purpose/purpose hint |
-| **Luật IF–THEN** | **103** | Có priority + Certainty Factor |
-| **Chẩn đoán** | **50** | Severity + solution steps |
-| **Facts (triệu chứng)** | **~166** | Nguyên tử, không trùng lặp |
-| **Nhóm lỗi** | **8** | Xem bên dưới |
-
-### 🌳 8 Nhóm Lỗi (phân nhánh ≥ 6 = 9 điểm theo thang giảng viên)
-
-| Nhóm | Mô tả | Số Q | Số Rules |
-|------|--------|------|----------|
-| ⚡ Nguồn / Khởi động | Không lên nguồn, pin, adapter, POST fail | Q02–Q08 | ~25 |
-| 🖥️ Màn hình / Hiển thị | Màn đen, sọc, flicker, backlight, GPU | Q09–Q12 | ~15 |
-| 🪟 Windows / Hệ điều hành | BSOD, boot loop, driver, startup repair | Q13–Q19 | ~20 |
-| 🌐 Mạng / Internet | WiFi, LAN, DNS, IP conflict, adapter | Q20–Q26 | ~15 |
-| 🔊 Âm thanh / Camera | Loa, micro, webcam, driver audio | Q27–Q31 | ~10 |
-| 🖱️ Thiết bị ngoại vi | USB, Bluetooth, Touchpad, bàn phím | Q32–Q35 | ~10 |
-| ⚙️ Hiệu năng / Nhiệt độ | Chậm, nóng, virus, RAM/CPU/Disk 100% | Q37–Q44 | ~5 |
-| 💾 Ổ đĩa / Lưu trữ | HDD/SSD hỏng, bad sector, ổ đầy | Q36, Q45–Q50 | ~3 |
-
----
-
-## 🏗️ Kiến trúc hệ thống
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 NGƯỜI DÙNG (Web Browser)                     │
-│         Giao diện Chat — HTML / CSS / JavaScript             │
-└───────────────────────┬─────────────────────────────────────┘
-                        │  HTTP (REST API)
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│              FLASK WEB SERVER  (app.py)                      │
-│  /start  /message  /select  /submit  /explanation  /reset   │
-└──────┬────────────────┬──────────────────┬──────────────────┘
-       │                │                  │
-       ▼                ▼                  ▼
-  ┌─────────┐    ┌──────────────┐   ┌────────────────┐
-  │   NLU   │    │    ENGINE    │   │   SERVICES     │
-  │ Intent  │    │ WorkingMem   │   │ SessionStore   │
-  │ Classify│    │ RuleModel    │   │ TTL=30min      │
-  │ Fact    │    │ ForwardChain │   └────────────────┘
-  │ Extract │    │ DiagSession  │
-  └─────────┘    │ QuestionSel  │
-                 │ Explanation  │
-                 └──────┬───────┘
-                        │
-                        ▼
-              ┌──────────────────────┐
-              │   KNOWLEDGE BASE     │
-              │  06_questions.json   │
-              │  07_rules_diag.json  │
-              └──────────────────────┘
+```text
+User message
+   |
+   v
+NLU / fact extraction
+   |
+   v
+Working memory
+   |
+   v
+MATCH applicable rules
+   |
+   v
+SELECT by priority / specificity / certainty
+   |
+   v
+FIRE rule
+   |
+   +--> add facts
+   +--> trigger diagnosis
+   +--> request missing evidence
+   |
+   v
+Explanation builder
 ```
 
----
+## Key ideas
 
-## 🧠 Phương pháp suy luận: Forward Chaining
+### Forward chaining
 
-Hệ thống sử dụng **Forward Chaining** (suy luận tiến) theo vòng lặp:
+The inference engine repeatedly matches rules against known facts and fires applicable rules until no further useful rule can be activated.
 
-```
-        Khởi đầu: Facts thu thập từ người dùng
-                         │
-                         ▼
-              ┌─────── MATCH ────────┐
-              │ Tìm rules applicable │
-              │ (thỏa IF-conditions) │
-              └────────┬─────────────┘
-                       │  Conflict Set rỗng?  ──► STOP (Fixed Point)
-                       ▼
-              ┌─────── SELECT ───────┐
-              │ Conflict Resolution: │
-              │  1. Priority (1–5)   │
-              │  2. Specificity      │
-              │  3. Certainty Factor │
-              └────────┬─────────────┘
-                       │
-                       ▼
-              ┌─────── FIRE ─────────┐
-              │ Rule kích hoạt:      │
-              │  + Thêm facts mới    │
-              │  → Trigger diagnosis │
-              └────────┬─────────────┘
-                       │
-                       └──────────► Lặp lại
+### Certainty factor
+
+When multiple rules support the same diagnosis, confidence can be combined using the MYCIN-style formulation:
+
+```text
+CFcombined = CF1 + CF2 * (1 - CF1)
 ```
 
-### Certainty Factor (mô hình MYCIN)
+### Dynamic questioning
 
-Độ tin cậy của chẩn đoán được tính theo công thức MYCIN:
+The next question is selected from missing evidence instead of following one fixed questionnaire. The scoring logic considers coverage, discrimination between candidate diagnoses, group relevance, and rule proximity.
 
-$$CF_{combined} = CF_1 + CF_2 \times (1 - CF_1)$$
+### Explainability
 
-Ví dụ: Nếu Rule_A kết luận DIAG_X với CF=0.85, Rule_B cũng kết luận DIAG_X với CF=0.70:
-$$CF = 0.85 + 0.70 \times (1 - 0.85) = 0.85 + 0.105 = \mathbf{0.955}$$
+The system keeps enough inference state to show the evidence and reasoning path behind a result.
 
----
+## Architecture
 
-## 📂 Cấu trúc thư mục
-
-```
-project/
-│
-├── app.py                          # Flask application (7 routes)
-├── requirements.txt                # flask, pytest
-│
-├── data/                           # Knowledge Base (copy từ knowledge_base/)
-│   ├── 06_questions.json           # 50 câu hỏi
-│   └── 07_rules_and_diagnoses.json # 103 rules + 50 diagnoses
-│
-├── engine/                         # Core Inference Engine
-│   ├── __init__.py
-│   ├── working_memory.py           # Bộ nhớ làm việc (fact base)
-│   ├── rule_model.py               # Rule, DiagnosisResult (CF MYCIN)
-│   ├── forward_engine.py           # Forward Chaining (MATCH-SELECT-FIRE)
-│   ├── diagnostic_session.py       # Session state + KB loader
-│   ├── question_selector.py        # Dynamic Questioning (scoring)
-│   └── explanation_builder.py      # Explanation Facility (XAI)
-│
-├── nlu/                            # Natural Language Understanding
-│   ├── __init__.py
-│   ├── patterns.py                 # Keyword → fact/intent mapping
-│   ├── intent_classifier.py        # Phân loại nhóm lỗi từ text
-│   └── fact_extractor.py           # Trích xuất facts từ text
-│
-├── services/                       # Web Services
-│   ├── __init__.py
-│   └── session_store.py            # In-memory session mgmt (TTL + ThreadLock)
-│
-├── templates/
-│   └── chat.html                   # Giao diện chat (Jinja2)
-│
-├── static/
-│   ├── css/style.css               # Thiết kế (white mode, Inter font)
-│   └── js/chat.js                  # Frontend logic (fetch API)
-│
-├── knowledge_base/                 # Source of Truth (gốc, không sửa)
-│   ├── 06_questions.json
-│   └── 07_rules_and_diagnoses.json
-│
-├── tests/                          # Unit & Integration Tests
-│   ├── test_engine.py              # 26 tests (WorkingMemory, Rule, Engine, E2E)
-│   ├── test_nlu.py                 # 9 tests (Intent, Fact)
-│   └── test_flow.py                # 9 tests (Flask routes, session)
-│
-└── report/
-    └── YeuCauGiangVien.txt
+```text
+Browser chat UI
+      |
+      v
+Flask application
+      |
+      +---- NLU / fact extraction
+      |
+      +---- inference engine
+      |       ├── working memory
+      |       ├── rule model
+      |       ├── forward chaining
+      |       ├── question selector
+      |       └── explanation builder
+      |
+      +---- session service
+      |
+      v
+JSON knowledge base
 ```
 
----
+## Tech stack
 
-## 🚀 Hướng dẫn chạy
+- Python
+- Flask
+- HTML / CSS / JavaScript
+- JSON knowledge base
+- pytest
 
-### Yêu cầu
+## Repository structure
 
-- Python 3.10+
-- pip
+```text
+engine/          inference engine
+nlu/             intent and fact extraction
+services/        session services
+knowledge_base/  source knowledge base
+data/            runtime knowledge-base data
+templates/       Flask templates
+static/          browser UI assets
+tests/           unit and integration tests
+docs / reports   academic and technical documentation
+```
 
-### Cài đặt
+## Run locally
 
 ```bash
-# 1. Clone / mở project
-cd project/
-
-# 2. Cài thư viện
 pip install -r requirements.txt
-
-# 3. Chạy server
 python app.py
 ```
 
-### Truy cập
+Then open:
 
-Mở trình duyệt và vào địa chỉ:
-
-```
+```text
 http://localhost:5000
 ```
 
-### Chạy Tests
+## Tests
 
 ```bash
-# Chạy toàn bộ test suite (43 tests)
 python -m pytest tests/ -v
-
-# Chạy riêng từng phần
-python -m pytest tests/test_engine.py -v   # Engine tests
-python -m pytest tests/test_nlu.py -v     # NLU tests
-python -m pytest tests/test_flow.py -v    # Flask route tests
 ```
 
----
+The repository contains engine, NLU, and application-flow tests.
 
-## Facebook Messenger Webhook Demo
+## Optional messaging integrations
 
-Tính năng này cho phép cấu hình Meta Webhook để người dùng nhắn Facebook Fanpage và bot Flask trả lời lại qua Messenger Send API. Không commit token thật vào source code; chỉ cấu hình bằng biến môi trường khi chạy demo.
+The project also contains experimental Meta webhook flows for Messenger / Instagram demos. Credentials are supplied only through environment variables; real access tokens should never be committed to the repository.
 
-### Biến môi trường cần có
+## Team
 
-- `VERIFY_TOKEN`: chuỗi dùng để verify webhook trên Meta, ví dụ demo: `tri_test_verify_2026`
-- `PAGE_ACCESS_TOKEN`: Page Access Token lấy trong Meta Developer Console
-- `META_GRAPH_VERSION`: tùy chọn, mặc định `v20.0`
-- `INSTAGRAM_ACCESS_TOKEN`: token dùng cho Instagram API khi bật gửi thật
-- `INSTAGRAM_API_VERSION`: tùy chọn, mặc định `v25.0`
-- `INSTAGRAM_BUSINESS_ACCOUNT_ID`: Instagram Business Account ID
+Developed as an academic Knowledge Technology project at Saigon University by:
 
-### Set env trên Windows CMD
+- Do Duy Quy
+- Lu Hong Phuc
+- Nguyen Huu Tri
+- Nguyen Dang Khoa
 
-```bat
-set VERIFY_TOKEN=tri_test_verify_2026
-set PAGE_ACCESS_TOKEN=<PAGE_ACCESS_TOKEN_CUA_BAN>
-set META_GRAPH_VERSION=v20.0
-set INSTAGRAM_ACCESS_TOKEN=<INSTAGRAM_ACCESS_TOKEN_CUA_BAN>
-set INSTAGRAM_API_VERSION=v25.0
-set INSTAGRAM_BUSINESS_ACCOUNT_ID=<INSTAGRAM_BUSINESS_ACCOUNT_ID_CUA_BAN>
-python app.py
-```
+## Why this project matters
 
-### Set env trên PowerShell
-
-```powershell
-$env:VERIFY_TOKEN="tri_test_verify_2026"
-$env:PAGE_ACCESS_TOKEN="<PAGE_ACCESS_TOKEN_CUA_BAN>"
-$env:META_GRAPH_VERSION="v20.0"
-$env:INSTAGRAM_ACCESS_TOKEN="<INSTAGRAM_ACCESS_TOKEN_CUA_BAN>"
-$env:INSTAGRAM_API_VERSION="v25.0"
-$env:INSTAGRAM_BUSINESS_ACCOUNT_ID="<INSTAGRAM_BUSINESS_ACCOUNT_ID_CUA_BAN>"
-python app.py
-```
-
-### Chạy ngrok
-
-Mở terminal khác và chạy:
-
-```bash
-ngrok http 5000
-```
-
-Lấy URL HTTPS mà ngrok cấp, ví dụ `https://abc-123.ngrok-free.app`.
-
-### Cấu hình Facebook Messenger
-
-Facebook Messenger integration hiện tại dùng route riêng:
-
-```text
-/webhook/meta
-```
-
-### Meta App URLs
-
-Khi Meta Developer App yêu cầu các URL pháp lý, dùng các đường dẫn sau qua ngrok:
-
-```text
-Privacy Policy URL = https://<ngrok-url>/privacy
-Terms of Service URL = https://<ngrok-url>/terms
-Data Deletion URL = https://<ngrok-url>/data-deletion
-```
-
-Trong Meta Developer Console của app gắn với Fanpage:
-
-```text
-Callback URL = https://<ngrok-url>/webhook/meta
-Verify Token = tri_test_verify_2026
-```
-
-Webhook verify sẽ gọi:
-
-```text
-GET /webhook/meta?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...
-```
-
-Nếu token đúng, Flask trả lại `hub.challenge`. Sau đó subscribe webhook field `messages` cho Page.
-
-### Cấu hình Instagram API new flow
-
-Instagram API flow mới dùng route riêng:
-
-```text
-/webhook/instagram
-```
-
-Callback URL:
-
-```text
-https://<ngrok-url>/webhook/instagram
-```
-
-Verify Token:
-
-```text
-tri_test_verify_2026
-```
-
-`POST /webhook/instagram` sẽ log raw body với prefix `[IG API]`, thử parse `sender_id` và `text` từ `entry[].messaging[]` hoặc `entry[].changes[]`, rồi đưa message vào chatbot rule-based. Webhook sẽ bỏ qua echo/self message nếu payload có `message.is_echo` hoặc `sender_id` trùng `INSTAGRAM_BUSINESS_ACCOUNT_ID`.
-
-Instagram Send API dùng endpoint:
-
-```text
-POST https://graph.instagram.com/v25.0/me/messages
-```
-
-Access token được truyền qua query param `access_token=INSTAGRAM_ACCESS_TOKEN`. Nếu thiếu token, server sẽ log:
-
-```text
-[IG API] Missing INSTAGRAM_ACCESS_TOKEN
-```
-
-### Test bằng Fanpage
-
-1. Chạy Flask bằng `python app.py`.
-2. Chạy `ngrok http 5000`.
-3. Cấu hình Callback URL và Verify Token trên Meta như trên.
-4. Nhắn vào Fanpage:
-
-```text
-hello
-```
-
-Bot sẽ phản hồi và hiển thị câu hỏi chẩn đoán đầu tiên. Tiếp tục nhắn:
-
-```text
-laptop không lên nguồn
-```
-
-Bot sẽ cố gắng đưa nội dung này vào flow chẩn đoán rule-based hiện có. Khi muốn làm lại phiên Messenger, nhắn:
-
-```text
-reset
-```
-
-hoặc:
-
-```text
-bắt đầu lại
-```
-
-Server sẽ log các bước quan trọng: verify webhook, nhận message từ Meta, tạo session theo `sender.id`, gửi reply và response từ Meta Send API.
-
----
-
-## 🎯 Tính năng nổi bật
-
-### 1. Dynamic Questioning (Câu hỏi thông minh)
-
-Thay vì hỏi theo thứ tự cứng nhắc, hệ thống **chọn câu hỏi tiếp theo thông minh** dựa trên:
-
-| Tiêu chí | Trọng số | Ý nghĩa |
-|---|---|---|
-| Coverage Score | ×2.0 | Câu hỏi giúp cover nhiều missing facts |
-| Discrimination | ×1.5 | Phân biệt được nhiều diagnoses |
-| Group Bonus | ×0.5 | Ưu tiên cùng nhóm lỗi |
-| Proximity | ×1.0 | Giúp fire rules gần nhất |
-
-### 2. NLU Layer (Hiểu ngôn ngữ tự nhiên)
-
-Người dùng có thể **gõ text tự nhiên** thay vì chỉ click nút:
-
-```
-User: "laptop không lên nguồn gì hết, bấm nút không có phản ứng"
-         ↓ Intent Classifier
-      Intent: "power_startup" (confidence: 0.91)
-         ↓ Fact Extractor
-      Facts: ["no_power", "fan_not_spinning"]
-         ↓ Option Matcher
-      Match Q02 → Option A → ds.answer(["A"])
-         ↓
-      Câu hỏi tiếp theo: Q03 (Laptop hay Desktop?)
-```
-
-### 3. Explanation Facility (Giải thích suy luận)
-
-Người dùng có thể xem **toàn bộ quá trình** hệ thống đưa ra kết quả:
-
-- 📋 Danh sách Q&A đã hỏi
-- 📌 Facts đã thu thập được
-- ⚡ Các luật đã kích hoạt + CF
-- 🏥 Kết quả với độ tin cậy
-
-### 4. Giao diện Web Chat
-
-- ✅ Quick-reply buttons (single_choice)
-- ✅ Checkbox + Submit (multi_choice)
-- ✅ Text input với NLU
-- ✅ Typing indicator khi chờ
-- ✅ Side panel: facts + candidate diagnoses realtime
-- ✅ Diagnosis card với CF meter
-- ✅ "Bắt đầu lại" ở header và màn kết quả
-
----
-
-## 📈 Kết quả kiểm thử
-
-### Test Suite: 43/43 Tests Passed ✅
-
-```
-tests/test_engine.py  ::  26 passed
-tests/test_nlu.py     ::   9 passed
-tests/test_flow.py    ::   9 passed
-─────────────────────────────────────
-TOTAL                 ::  43 passed in 0.32s
-```
-
-### Test Cases E2E tiêu biểu
-
-| TC | Kịch bản | Kết quả mong đợi | Trạng thái |
-|----|----------|-----------------|------------|
-| TC01 | Laptop không sạc → adapter hỏng | `DIAG_PWR_01` | ✅ |
-| TC02 | Laptop không sạc → pin chai | `DIAG_PWR_02` | ✅ |
-| TC05 | Màn hình lỗi sau cập nhật driver | `DIAG_DSP_02` | ✅ |
-| TC08 | BSOD memory management | `DIAG_OS_03` | ✅ |
-| TC15 | Không thấy WiFi adapter | `DIAG_NET_02` | ✅ |
-| TC21 | Mất tiếng, driver âm thanh lỗi | `DIAG_AUD_01` | ✅ |
-| TC24 | Cổng USB hỏng | `DIAG_PER_01` | ✅ |
-| TC29 | HDD tiếng kêu lách cách | `DIAG_STR_02` | ✅ |
-
----
-
-## 🗂️ Luồng chẩn đoán mẫu
-
-**Tình huống:** "Laptop không lên nguồn, không sạc được"
-
-```
-Q01: Vấn đề chính là gì?
-     → [A] Máy không bật / không có điện
-
-Q02: Khi nhấn nút nguồn, điều gì xảy ra?
-     → [A] Hoàn toàn không có phản ứng gì
-
-Q03: Laptop hay Desktop?
-     → [A] Laptop              ← User gõ "laptop" → NLU match tự động
-
-Q05: Tình trạng pin và sạc?
-     → [B] Đèn sạc sáng nhưng pin không tăng
-
-                 ↓ Forward Chaining
-    Working Memory: {no_power, fan_not_spinning, is_laptop, no_charge}
-    
-    Rule R012 FIRE: no_power + is_laptop → probable_power_issue_laptop
-    Rule R015 FIRE: no_power + is_laptop + no_charge → DIAG_PWR_02 (CF=0.85)
-
-╔══════════════════════════════════════════╗
-║  🏥 KẾT QUẢ: Pin laptop chai hoặc hỏng  ║
-║  Độ tin cậy: 85%  |  Mức độ: 🟠 Cao     ║
-╚══════════════════════════════════════════╝
-```
-
----
-
-## 📚 Tài liệu tham khảo
-
-1. Wikipedia — Expert System: https://en.wikipedia.org/wiki/Expert_system
-2. Wikipedia — Forward Chaining: https://en.wikipedia.org/wiki/Forward_chaining
-3. Wikipedia — Backward Chaining: https://en.wikipedia.org/wiki/Backward_chaining
-4. Shortliffe, E.H. (1976) — *MYCIN: Computer-Based Medical Consultations* — Certainty Factor model
-5. Russell & Norvig — *Artificial Intelligence: A Modern Approach* — Chapter 9: Inference in First-Order Logic
-6. Flask Documentation: https://flask.palletsprojects.com/en/3.0.x/
-7. Experta (CLIPS-like rules engine for Python): https://github.com/noxdafox/experta
-
----
-
-## ⚖️ Đánh giá theo thang điểm giảng viên
-
-| Tiêu chí | Yêu cầu | Nhóm đạt |
-|---|---|---|
-| Nhị phân (7đ) | 2 nhánh | ✅ Đã vượt |
-| Tam phân (8đ) | 3 nhánh | ✅ Đã vượt |
-| Tứ phân (8.5đ) | 4 nhánh | ✅ Đã vượt |
-| **Lục phân (9đ)** | **≥ 6 nhánh** | ✅ **8 nhánh** |
-| **≥ 9đ** | Nhiều nhánh, đẹp, hay | ✅ **8 nhóm lớn + 50 chẩn đoán + Web Chat + NLU + Explanation** |
-
-> **Hệ thống đạt:** 8 nhóm lỗi · 103 luật · 50 chẩn đoán · Giao diện web đầy đủ · NLU layer · Dynamic Questioning · Explanation Facility
-
----
-
-<div align="center">
-
-**Đại học Sài Gòn — Khoa Công nghệ Thông tin**  
-Năm học 2025–2026
-
-</div>
+The goal is not just to classify a symptom, but to demonstrate a transparent symbolic-AI workflow: explicit facts, explicit rules, controlled conflict resolution, uncertainty handling, interactive evidence collection, and human-readable explanations.
